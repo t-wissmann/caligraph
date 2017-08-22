@@ -17,6 +17,7 @@ library
   exposed-modules:
     Caligraph.Lib
     Caligraph.Remind.Parser
+    Caligraph.Remind.Types
   build-depends:
       base >= 4.7 && < 5
     , parsec

@@ -2,43 +2,13 @@
 
 module Caligraph.Remind.Parser where
 
+import Caligraph.Remind.Types
+
 import Prelude hiding (rem)
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Token
 import Text.ParserCombinators.Parsec as P
 import Data.Maybe (catMaybes)
-
-data RFLine =
-    Comment String
-  | Include String
-  | Rem REM
-  | Omit String
-  | Fset String
-  deriving (Eq,Show)
-
-data REM = REM [RemArg] String deriving (Eq,Show)
-
-data RemArg =
-    ONCE
-  | Date_spec PartialDate
-  | Delta Int
-  | Repeat Int
-  | AT Time
-  | DURATION Time
-  | UNTIL PartialDate
-  deriving (Eq,Show)
-
-data Time = Time
-  { thour :: Int
-  , tmin :: Int
-  } deriving (Eq,Show)
-
-data PartialDate = PartialDate
-  { pday  :: Maybe Int
-  , pmonth :: Maybe Int
-  , pyear :: Maybe Int
-  } deriving (Eq,Show)
-
 
 int :: GenParser Char st Int
 int = read <$> many1 digit
@@ -176,6 +146,7 @@ groupLines =
           [(l1,reverse str1rev)]
 
         (_, res) -> (l1,str1) : res
+
 
 parse :: String -> IO [Either ParseError (Int,RFLine)]
 parse path = do
