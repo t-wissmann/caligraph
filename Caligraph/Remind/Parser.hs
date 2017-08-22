@@ -16,7 +16,17 @@ data RFLine =
   | Fset String
   deriving (Eq,Show)
 
-data REM = REM PartialDate (Maybe Int) (Maybe Time) (Maybe Time) String deriving (Eq,Show)
+data REM = REM [RemArg] String deriving (Eq,Show)
+
+data RemArg =
+    ONCE
+  | Date_spec PartialDate
+  | Delta Int
+  | Repeat Int
+  | AT Time
+  | DURATION Time
+  | UNTIL PartialDate
+  deriving (Eq,Show)
 
 data Time = Time
   { thour :: Int
@@ -49,7 +59,7 @@ rfLine =
 
 month :: GenParser Char st Int
 month =
-  spaces >> pmonth
+  pmonth
   where
     month_names =
       [ "Jan", "Feb", "Mar", "Apr", "May", "Jun"
@@ -63,7 +73,9 @@ month =
 dateUS :: GenParser Char st PartialDate
 dateUS = do
   m <- optionMaybe month
+  many1 space
   y <- optionMaybe int
+  many1 space
   d <- optionMaybe int
   return $ PartialDate {
     pday = d,
@@ -110,14 +122,20 @@ msg = do
 rem :: GenParser Char st REM
 rem = do
   spaces
-  d <- date
-  o <- optionMaybe offset
-  skipMany1 space
-  at <- optionMaybe (try $ string "AT " >> spaces >> time)
-  skipMany1 space
-  dur <- optionMaybe (try $ string "DURATION " >> spaces >> time)
+  args <- many (do x <- try remArg ; many1 space ; return x)
   m <- msg
-  return (REM d o at dur m)
+  eof
+  return (REM args m)
+
+remArg :: GenParser Char st RemArg
+remArg = do
+  (fmap Date_spec $ try date)
+  <|> (fmap Delta $ try offset)
+  <|> (fmap Repeat $ try (char '*') >> int)
+  <|> (fmap AT $ try (string "AT" >> many1 space) >> time)
+  <|> (fmap DURATION $ try (string "DURATION" >> many1 space) >> time)
+  <|> (fmap UNTIL $ try (string "UNTIL" >> many1 space) >> date)
+
 
 fset :: GenParser Char st String
 fset = many1 (noneOf "\n")
