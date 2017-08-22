@@ -1,6 +1,11 @@
 module Main where
 
-import Lib
+import Caligraph.Lib
+import Caligraph.Remind.Parser
+
+import Control.Monad
 
 main :: IO ()
-main = someFunc
+main =
+  forM_ parse $ \x ->
+    putStrLn $ show x

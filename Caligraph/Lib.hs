@@ -1,4 +1,4 @@
-module Lib
+module Caligraph.Lib
     ( someFunc
     ) where
 
