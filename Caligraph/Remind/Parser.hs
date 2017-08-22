@@ -1,4 +1,4 @@
-{-# Strict #-}
+{-# LANGUAGE StrictData #-}
 
 module Caligraph.Remind.Parser where
 
@@ -11,6 +11,7 @@ data Line a =
   deriving (Eq,Show)
 
 
-parse = [Comment () "Test"]
+-- parse : String -> IO [Line ()]
+parse str = return [Comment () str]
 
 

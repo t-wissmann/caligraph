@@ -6,6 +6,7 @@ import Caligraph.Remind.Parser
 import Control.Monad
 
 main :: IO ()
-main =
-  forM_ parse $ \x ->
+main = do
+  p <- parse "/home/thorsten/.reminders.d/termine.rem"
+  forM_ p $ \x ->
     putStrLn $ show x
