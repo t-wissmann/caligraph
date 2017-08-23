@@ -16,8 +16,17 @@ ui s = [str (show $ focusDay s) <+> vBorder <+> str "World!"]
 binds = Map.fromList
   [ (KEsc, halt)
   , (KChar 'q', halt)
-  , (KChar 'j', switchDay (-1))
-  , (KChar 'k', switchDay 1)
+
+  -- hjkl
+  , (KChar 'h', switchDay (-1))
+  , (KChar 'j', switchDay  7)
+  , (KChar 'k', switchDay (-7))
+  , (KChar 'l', switchDay  1)
+  -- arrow keys
+  , (KLeft , switchDay (-1))
+  , (KDown , switchDay  7)
+  , (KUp   , switchDay (-7))
+  , (KRight, switchDay  1)
   ]
 
 switchDay delta s =
