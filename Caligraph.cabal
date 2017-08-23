@@ -23,6 +23,9 @@ library
       base >= 4.7 && < 5
     , parsec
     , brick
+    , time
+    , vty
+    , containers
   default-language:    Haskell2010
 
 executable caligraph
