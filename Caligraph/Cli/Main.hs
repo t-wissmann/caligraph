@@ -6,21 +6,38 @@ import Brick.Main
 import Data.Time.Calendar
 import Graphics.Vty.Attributes
 import Graphics.Vty.Input.Events
+import Data.Time.Calendar (Day)
+import Data.Time.Clock (getCurrentTime, utctDay)
 import qualified Data.Map.Strict as Map
 
-ui :: Int -> [Widget ()]
-ui s = [str (show s) <+> vBorder <+> str "World!"]
+ui :: State -> [Widget ()]
+ui s = [str (show $ focusDay s) <+> vBorder <+> str "World!"]
 
 binds = Map.fromList
   [ (KEsc, halt)
   , (KChar 'q', halt)
-  , (KChar 'j', (\s -> continue (s + 1)))
-  , (KChar 'k', (\s -> continue (s - 1)))
+  , (KChar 'j', switchDay (-1))
+  , (KChar 'k', switchDay 1)
   ]
 
+switchDay delta s =
+  continue (s { focusDay = addDays delta (focusDay s) })
 
 
-mainApp :: App Int () ()
+data State = State
+  { scrollOffset :: Int
+  , scrollDay :: Day
+  , currentDay :: Day
+  , focusDay :: Day
+  }
+
+stateToday :: IO State
+stateToday = do
+  g <- getCurrentTime
+  let d = utctDay g
+  return $ State 0 d d d
+
+mainApp :: App State () ()
 mainApp =
   App { appDraw = ui
       , appChooseCursor = const $ const Nothing
@@ -47,6 +64,7 @@ myHandleEvent s (MouseUp _ _ _) = continue s
 
 testmain :: IO ()
 testmain = do
-  defaultMain mainApp 0
+  s <- stateToday
+  defaultMain mainApp s
   return ()
 
