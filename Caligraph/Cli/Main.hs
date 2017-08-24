@@ -1,15 +1,19 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Caligraph.Cli.Main where
 
 import Brick
 import Brick.Widgets.Border
 import Brick.Main
+import Brick.Widgets.Core (withAttr)
+import Brick.AttrMap (attrMap, AttrMap)
 import Data.Time.Calendar
 import Graphics.Vty.Attributes
 import Graphics.Vty.Input.Events
 import Data.Time.Calendar (Day)
 import Data.Time.Clock (getCurrentTime, utctDay)
+import Data.Time.Calendar.WeekDate (toWeekDate)
 import qualified Data.Map.Strict as Map
 
 import Lens.Micro
@@ -18,12 +22,27 @@ import Lens.Micro.TH
 data State = State
   { _scrollOffset :: Int
   , _focusDay :: Day
+  , _today :: Day
   }
 
 makeLenses ''State
 
 ui :: State -> [Widget ()]
-ui s = [str (show $ (s^.focusDay)) <+> vBorder <+> str "World!"]
+ui s =
+  [days]
+  where
+    (_,_,dayOfWeek) = toWeekDate (s^.focusDay)
+    days =
+      [1 - toInteger dayOfWeek .. 7 - toInteger dayOfWeek]
+      & map (flip addDays (s^.focusDay))
+      & map (\d -> dayWidget d (d == (s^.today)) (d == (s^.focusDay)))
+      & foldr1 (\x y -> x <+> vBorder <+> y)
+
+dayWidget :: Day -> Bool -> Bool -> Widget ()
+dayWidget day isToday isFocused =
+  (if isFocused then withAttr "focusDay" else id) $
+  (if isToday then withAttr "today" else id) $
+  str (show day)
 
 binds = Map.fromList
   [ (KEsc, halt)
@@ -50,7 +69,7 @@ stateToday :: IO State
 stateToday = do
   g <- getCurrentTime
   let d = utctDay g
-  return $ State 0 d
+  return $ State 0 d d
 
 mainApp :: App State () ()
 mainApp =
@@ -58,7 +77,10 @@ mainApp =
       , appChooseCursor = const $ const Nothing
       , appHandleEvent = myHandleEvent
       , appStartEvent = return
-      , appAttrMap = const $ attrMap defAttr []
+      , appAttrMap = const $ attrMap defAttr
+        [ ("today", fg red)
+        , ("focusDay", bg black)
+        ]
       }
 
 myHandleEvent s (VtyEvent e) =
