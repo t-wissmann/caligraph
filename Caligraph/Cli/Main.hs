@@ -8,9 +8,16 @@ import Brick.Widgets.Border
 import Brick.Main
 import Brick.Widgets.Core (withAttr, cropTopBy, cropBottomBy,setAvailableSize)
 import Brick.AttrMap (attrMap, AttrMap)
+
+import Control.Monad (when)
+import Control.Monad.IO.Class (liftIO)
+
 import Data.Time.Calendar
+import qualified Graphics.Vty as V
 import Graphics.Vty.Attributes
 import Graphics.Vty.Input.Events
+import Graphics.Vty (outputIface)
+import Graphics.Vty.Output.Interface (supportsMode,Mode(Mouse),setMode)
 import Data.Time.Calendar (Day)
 import Data.Time.Clock (getCurrentTime, utctDay)
 import Data.Time.Calendar.WeekDate (toWeekDate)
@@ -89,7 +96,10 @@ dayWidget :: State -> Day -> Widget ()
 dayWidget st day =
   (if day == (st^.focusDay) then withAttr "focusDay" else id) $
   (if day == (st^.today) then withAttr "today" else id) $
-  hBorder <=> str (show day) <=> vBox (map (str.show) [1..30])
+  hBorder
+  <=> str (show day)
+  <=> str (show (st^.scrollOffset))
+  <=> vBox (map (str.show) [1..30])
 
 binds = Map.fromList
   [ (KEsc, halt)
@@ -118,12 +128,23 @@ stateToday = do
   let d = utctDay g
   return $ prepareRows $ State 0 d d (100,100) []
 
+
+tryEnableMouse :: EventM n ()
+tryEnableMouse = do
+  vty <- Brick.Main.getVtyHandle
+  let output = outputIface vty
+  when (supportsMode output Mouse) $
+    liftIO $ do
+      setMode output Mouse True
+  return ()
+
+
 mainApp :: App State () ()
 mainApp =
   App { appDraw = ui
       , appChooseCursor = const $ const Nothing
       , appHandleEvent = myHandleEvent
-      , appStartEvent = return
+      , appStartEvent = (\s -> tryEnableMouse >> return s)
       , appAttrMap = const $ attrMap defAttr
         [ ("today", fg red)
         , ("focusDay", bg black)
@@ -140,6 +161,10 @@ myHandleEvent s (VtyEvent e) =
         Nothing -> continue s
     EvResize w h ->
       continue (s & size .~ (w,h))
+    EvMouseDown _ _ BScrollUp _ ->
+      continue (s & scrollOffset %~ ((+) 1))
+    EvMouseDown _ _ BScrollDown _ ->
+      continue (s & scrollOffset %~ \x -> (x - 1))
     _ ->
       continue s
 
@@ -150,7 +175,11 @@ myHandleEvent s (MouseUp _ _ _) = continue s
 
 testmain :: IO ()
 testmain = do
+  let buildVty = do
+        v <- V.mkVty =<< V.standardIOConfig
+        V.setMode (V.outputIface v) V.Mouse True
+        return v
   s <- stateToday
-  defaultMain mainApp s
+  customMain buildVty Nothing mainApp s
   return ()
 
