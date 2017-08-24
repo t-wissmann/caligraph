@@ -20,7 +20,7 @@ library
     Caligraph.Remind.Types
     Caligraph.Cli.Main
   build-depends:
-      base >= 4.7 && < 5
+      base
     , parsec
     , brick
     , time
