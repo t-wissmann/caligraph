@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Caligraph.Cli.Main where
 
 import Brick
@@ -10,8 +12,18 @@ import Data.Time.Calendar (Day)
 import Data.Time.Clock (getCurrentTime, utctDay)
 import qualified Data.Map.Strict as Map
 
+import Lens.Micro
+import Lens.Micro.TH
+
+data State = State
+  { _scrollOffset :: Int
+  , _focusDay :: Day
+  }
+
+makeLenses ''State
+
 ui :: State -> [Widget ()]
-ui s = [str (show $ focusDay s) <+> vBorder <+> str "World!"]
+ui s = [str (show $ (s^.focusDay)) <+> vBorder <+> str "World!"]
 
 binds = Map.fromList
   [ (KEsc, halt)
@@ -30,21 +42,15 @@ binds = Map.fromList
   ]
 
 switchDay delta s =
-  continue (s { focusDay = addDays delta (focusDay s) })
+  continue (s & focusDay %~ addDays delta)
 
 
-data State = State
-  { scrollOffset :: Int
-  , scrollDay :: Day
-  , currentDay :: Day
-  , focusDay :: Day
-  }
 
 stateToday :: IO State
 stateToday = do
   g <- getCurrentTime
   let d = utctDay g
-  return $ State 0 d d d
+  return $ State 0 d
 
 mainApp :: App State () ()
 mainApp =
