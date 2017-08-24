@@ -44,14 +44,14 @@ ui s =
   & map (\(ct,days,cb) ->
         map (dayWidget s) days
         & map (setAvailableSize (daywidth,daysHeight s days))
-        & foldr1 (\x y -> x <+> vBorder <+> y)
-        & cropTopBy ct
-        & cropBottomBy cb
+        & map (cropTopBy ct)
+        & map (cropBottomBy cb)
+        & hBox
         )
   & vBox
   & (\x -> [x])
   where (fullwidth,_) = s^.size
-        daywidth = (fullwidth - 8) `div` 7
+        daywidth = fullwidth `div` 7
 
 
 prepareRows :: State -> State
@@ -66,10 +66,11 @@ prepareRows st =
 
     addWeeksLater :: Int -> [Day] -> [([Day],Int)]
     addWeeksLater space_remain week =
-      if space_remain <= 0
-      then [(week, -space_remain)]
+      if space_remain <= weekHeight
+      then [(week, weekHeight - space_remain)]
       else
-        (week, 0) : (addWeeksLater (space_remain - daysHeight st week) $ map (addDays 7) week)
+        (week, 0) : (addWeeksLater (space_remain - weekHeight) $ map (addDays 7) week)
+      where weekHeight = daysHeight st week
 
     addWeeksBefore :: Int -> [([Day],Int)] -> [(Int,[Day],Int)]
     addWeeksBefore cur_scroll_offset ((week,cropBot):later) =
@@ -84,7 +85,7 @@ prepareRows st =
 
     new_rows =
       focusedWeek
-      & addWeeksLater ((fst $ st^.size) - (st^.scrollOffset))
+      & addWeeksLater ((snd $ st^.size) - (st^.scrollOffset))
       & addWeeksBefore (st^.scrollOffset)
 
 daysHeight :: State -> [Day] -> Int
@@ -100,7 +101,8 @@ dayWidget st day =
   (if day == (st^.today) then withAttr "today" else id) $
   hBorder
   <=> str (show day)
-  <=> str (show (st^.scrollOffset))
+  <=> str ("scrolloff: " ++ show (st^.scrollOffset))
+  <=> str ("weeks: " ++ show (length (st^.rows)))
   <=> vBox (map (str.show) [1..30])
 
 binds = Map.fromList
@@ -120,7 +122,7 @@ binds = Map.fromList
   ]
 
 switchDay delta s =
-  continue (s & focusDay %~ addDays delta)
+  continue (s & focusDay %~ addDays delta & prepareRows)
 
 
 
@@ -162,11 +164,11 @@ myHandleEvent s (VtyEvent e) =
         Just cb -> cb s
         Nothing -> continue s
     EvResize w h ->
-      continue (s & size .~ (w,h))
+      continue (s & size .~ (w,h) & prepareRows)
     EvMouseDown _ _ BScrollUp _ ->
-      continue (s & scrollOffset %~ ((+) 1))
+      continue (s & scrollOffset %~ ((+) 3) & prepareRows)
     EvMouseDown _ _ BScrollDown _ ->
-      continue (s & scrollOffset %~ \x -> (x - 1))
+      continue (s & scrollOffset %~ (\x -> (x - 3)) & prepareRows)
     _ ->
       continue s
 
