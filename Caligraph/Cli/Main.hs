@@ -23,17 +23,20 @@ import Graphics.Vty.Output.Interface (supportsMode,Mode(Mouse),setMode)
 import Data.Time.Calendar (Day)
 import Data.Time.Clock (getCurrentTime, utctDay)
 import Data.Time.Calendar.WeekDate (toWeekDate)
+import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 
 import Lens.Micro
 import Lens.Micro.TH
 
 data State = State
-  { _scrollOffset :: Int -- the row of the focused day
+  { _scrollOffset :: Int -- the number of rows hidden of _scrollDay
+  , _scrollDay :: Day
   , _focusDay :: Day
   , _today :: Day
   , _size :: (Int,Int)
-  , _rows :: [(Int,[Day],Int)] -- the visible rows
+  , _rows :: [([Day],Int,Int)] -- the visible rows
+  -- , _columns ::Int -- the number of days per row
   }
 
 makeLenses ''State
@@ -41,52 +44,53 @@ makeLenses ''State
 ui :: State -> [Widget ()]
 ui s =
   (s^.rows)
-  & map (\(ct,days,cb) ->
+  & map (\(days,height,cb) ->
         map (dayWidget s) days
-        & map (setAvailableSize (daywidth,daysHeight s days))
-        & map (cropTopBy ct)
+        & map (setAvailableSize (daywidth,height))
         & map (cropBottomBy cb)
         & hBox
         )
+  & mapHead (cropTopBy (s^.scrollOffset))
   & vBox
   & (\x -> [x])
   where (fullwidth,_) = s^.size
         daywidth = fullwidth `div` 7
+        mapHead _ [] = []
+        mapHead f (x:xs) = (f x:xs)
 
 
 prepareRows :: State -> State
 prepareRows st =
-  (st & rows .~ new_rows)
+  if (st^.scrollOffset < 0)
+  then st & scrollDay %~ (addDays (-7))
+          & (\s -> s & scrollOffset %~ (\x -> x + weekHeight s))
+          & prepareRows
+  else
+    if (st^.scrollOffset >= weekHeight st)
+    then st & scrollDay %~ (addDays (7))
+            & (\s -> s & scrollOffset %~ (\x -> x - weekHeight st))
+            & prepareRows
+    else
+      st & rows .~ new_rows_around (st^.scrollDay) (st^.scrollOffset)
   where
-    (_,_,dayOfWeek) = toWeekDate (st^.focusDay)
-    focusedWeek :: [Day]
-    focusedWeek =
-      [1 - toInteger dayOfWeek .. 7 - toInteger dayOfWeek]
-      & map (flip addDays (st^.focusDay))
-
-    addWeeksLater :: Int -> [Day] -> [([Day],Int)]
+    weekHeight s = daysHeight s (weekOf $ s^.scrollDay)
+    addWeeksLater :: Int -> [Day] -> [([Day],Int,Int)]
     addWeeksLater space_remain week =
-      if space_remain <= weekHeight
-      then [(week, weekHeight - space_remain)]
+      if space_remain <= curheight
+      then [(week, curheight, curheight - space_remain)]
       else
-        (week, 0) : (addWeeksLater (space_remain - weekHeight) $ map (addDays 7) week)
-      where weekHeight = daysHeight st week
+        (week, curheight, 0) : (addWeeksLater (space_remain - curheight) $ map (addDays 7) week)
+      where curheight = daysHeight st week
 
-    addWeeksBefore :: Int -> [([Day],Int)] -> [(Int,[Day],Int)]
-    addWeeksBefore cur_scroll_offset ((week,cropBot):later) =
-      if (cur_scroll_offset <= 0)
-      then ((-cur_scroll_offset,week,cropBot) : map (\(x,y) -> (0,x,y)) later)
-      else
-        addWeeksBefore new_scroll_offset ((weekBefore,0):(week,cropBot):later)
-        where
-            weekBefore = map (addDays (-7)) week
-            weekHeight = daysHeight st weekBefore
-            new_scroll_offset = cur_scroll_offset - weekHeight
+    weekOf :: Day -> [Day]
+    weekOf day =
+      [1 - toInteger dayOfWeek .. 7 - toInteger dayOfWeek]
+      & map (flip addDays day)
+      where (_,_,dayOfWeek) = toWeekDate day
 
-    new_rows =
-      focusedWeek
-      & addWeeksLater ((snd $ st^.size) - (st^.scrollOffset))
-      & addWeeksBefore (st^.scrollOffset)
+    new_rows_around day offset =
+      weekOf day
+      & addWeeksLater ((snd $ st^.size) + offset)
 
 daysHeight :: State -> [Day] -> Int
 daysHeight s ds = foldr max 0 $ map (dayHeight s) ds
@@ -103,7 +107,7 @@ dayWidget st day =
   <=> str (show day)
   <=> str ("scrolloff: " ++ show (st^.scrollOffset))
   <=> str ("weeks: " ++ show (length (st^.rows)))
-  <=> vBox (map (str.show) [1..30])
+  <=> fill '.'
 
 binds = Map.fromList
   [ (KEsc, halt)
@@ -137,7 +141,7 @@ stateToday :: (Int,Int) -> IO State
 stateToday size = do
   g <- getCurrentTime
   let d = utctDay g
-  return $ prepareRows $ State 0 d d size []
+  return $ prepareRows $ State 0 d d d size []
 
 
 tryEnableMouse :: EventM n ()
@@ -172,10 +176,10 @@ myHandleEvent s (VtyEvent e) =
         Nothing -> continue s
     EvResize w h ->
       continue (s & size .~ (w,h) & prepareRows)
-    EvMouseDown _ _ BScrollUp _ ->
-      continue (s & scrollOffset %~ ((+) 3) & prepareRows)
     EvMouseDown _ _ BScrollDown _ ->
-      continue (s & scrollOffset %~ (\x -> (x - 3)) & prepareRows)
+      continue (s & scrollOffset %~ ((+) 2) & prepareRows)
+    EvMouseDown _ _ BScrollUp _ ->
+      continue (s & scrollOffset %~ (\x -> (x - 2)) & prepareRows)
     _ ->
       continue s
 
