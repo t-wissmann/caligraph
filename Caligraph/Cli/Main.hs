@@ -9,6 +9,8 @@ import Brick.Main
 import Brick.Widgets.Core (withAttr, cropTopBy, cropBottomBy,setAvailableSize)
 import Brick.AttrMap (attrMap, AttrMap)
 
+import qualified System.Console.Terminal.Size as TS
+
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 
@@ -122,11 +124,11 @@ switchDay delta s =
 
 
 
-stateToday :: IO State
-stateToday = do
+stateToday :: (Int,Int) -> IO State
+stateToday size = do
   g <- getCurrentTime
   let d = utctDay g
-  return $ prepareRows $ State 0 d d (100,100) []
+  return $ prepareRows $ State 0 d d size []
 
 
 tryEnableMouse :: EventM n ()
@@ -179,7 +181,8 @@ testmain = do
         v <- V.mkVty =<< V.standardIOConfig
         V.setMode (V.outputIface v) V.Mouse True
         return v
-  s <- stateToday
+  termSize <- TS.size
+  s <- stateToday (maybe (100,100) (\(TS.Window w h) -> (h,w)) termSize)
   customMain buildVty Nothing mainApp s
   return ()
 

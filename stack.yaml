@@ -30,4 +30,5 @@ extra-deps:
 - void-0.7.2
 - vty-5.17
 - word-wrap-0.4.1
+- terminal-size-0.3.2.1
 resolver: ghc-8.0.2

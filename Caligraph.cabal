@@ -28,6 +28,7 @@ library
     , containers
     , microlens
     , microlens-th
+    , terminal-size
   default-language:    Haskell2010
 
 executable caligraph
