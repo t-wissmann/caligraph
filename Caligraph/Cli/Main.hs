@@ -108,6 +108,7 @@ dayWidget st day =
 binds = Map.fromList
   [ (KEsc, halt)
   , (KChar 'q', halt)
+  , (KChar 'o', gotoToday)
 
   -- hjkl
   , (KChar 'h', switchDay (-1))
@@ -123,6 +124,12 @@ binds = Map.fromList
 
 switchDay delta s =
   continue (s & focusDay %~ addDays delta & prepareRows)
+
+gotoToday s =
+  continue (s & focusDay .~ (s^.today) & prepareRows)
+
+
+
 
 
 
