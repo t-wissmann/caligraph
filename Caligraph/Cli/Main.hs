@@ -8,6 +8,8 @@ import Brick.Widgets.Border
 import Brick.Main
 import Brick.Widgets.Core (withAttr, cropTopBy, cropBottomBy,setAvailableSize)
 import Brick.AttrMap (attrMap, AttrMap)
+import Brick.Widgets.Border.Style
+
 
 import qualified System.Console.Terminal.Size as TS
 
@@ -123,13 +125,31 @@ dayHeight _ _ = 20
 
 dayWidget :: State -> Day -> Widget ()
 dayWidget st day =
-  (if day == (st^.focusDay) then withAttr "focusDay" else id) $
-  (if day == (st^.today) then withAttr "today" else id) $
-  hBorder
-  <=> str (show day)
-  <=> str ("scrolloff: " ++ show (st^.scrollOffset))
-  <=> str ("weeks: " ++ show (length (st^.rows)))
-  <=> fill '.'
+  ((str tlCorner <+> topBorder)
+    <=> (leftBorder <+> ((if day == blackBgDay then withAttr "focusDay" else id) $
+      str (show day)
+        <=> str ("scrolloff: " ++ show (st^.scrollOffset))
+        <=> str ("weeks: " ++ show (length (st^.rows)))
+        <=> fill ' ')))
+  where
+    boldDay = st^.today
+    blackBgDay = st^.focusDay
+    topBorder =
+      if day == boldDay || addDays (-7) day == boldDay
+      then withBorderStyle unicodeBold hBorder
+      else hBorder
+    leftBorder =
+      if day == boldDay || addDays (-1) day == boldDay
+      then withBorderStyle unicodeBold vBorder
+      else vBorder
+    junctionStyle' =[ "┼", "┏", "┓", "┗", "┛" ]
+    junctionStyle = [ "┼", "╆", "╅", "╄", "╃" ]
+    tlCorner = (!!) junctionStyle $
+      if day == boldDay then 1 else
+      if addDays (-1) day == boldDay then 2 else
+      if addDays (-7) day == boldDay then 3 else
+      if addDays (-8) day == boldDay then 4 else
+      0
 
 binds = Map.fromList
   [ (KEsc, halt)
