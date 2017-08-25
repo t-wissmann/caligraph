@@ -71,7 +71,27 @@ prepareRows st =
             & (\s -> s & scrollOffset %~ (\x -> x - weekHeight st))
             & prepareRows
     else
-      st & rows .~ new_rows_around (st^.scrollDay) (st^.scrollOffset)
+      case L.find (\(_,(ds,_,_)) -> st^.focusDay `elem` ds) (zip [0..] first_try) of
+        Just (0,(_,_,0)) ->
+          if (st^.scrollOffset > 0)
+          then st & scrollOffset .~ 0 & prepareRows
+          else st & rows .~ first_try
+        Just (0,(_,_,_)) ->
+          st & rows .~ first_try
+        Just (_,(_,_,0)) ->
+          st & rows .~ first_try
+        Just (_,(_,_,cb)) ->
+          st & scrollOffset %~ (\o -> o + cb) & prepareRows
+        Nothing ->
+          if ((st^.focusDay) `diffDays` (st^.scrollDay) > 0)
+          -- if focused day is in the future
+          then st & scrollDay .~ (st^.focusDay)
+                  & scrollOffset .~ (daysHeight st (weekOf (st^.focusDay)) - (snd $ st^.size))
+                  & prepareRows
+          -- if focused day is in the past
+          else st & scrollDay .~ st^.focusDay
+                  & scrollOffset .~ 0
+                  & prepareRows
   where
     weekHeight s = daysHeight s (weekOf $ s^.scrollDay)
     addWeeksLater :: Int -> [Day] -> [([Day],Int,Int)]
@@ -91,6 +111,8 @@ prepareRows st =
     new_rows_around day offset =
       weekOf day
       & addWeeksLater ((snd $ st^.size) + offset)
+
+    first_try = new_rows_around (st^.scrollDay) (st^.scrollOffset)
 
 daysHeight :: State -> [Day] -> Int
 daysHeight s ds = foldr max 0 $ map (dayHeight s) ds
@@ -177,9 +199,9 @@ myHandleEvent s (VtyEvent e) =
     EvResize w h ->
       continue (s & size .~ (w,h) & prepareRows)
     EvMouseDown _ _ BScrollDown _ ->
-      continue (s & scrollOffset %~ ((+) 2) & prepareRows)
+      continue (s & scrollOffset %~ ((+) 3) & prepareRows)
     EvMouseDown _ _ BScrollUp _ ->
-      continue (s & scrollOffset %~ (\x -> (x - 2)) & prepareRows)
+      continue (s & scrollOffset %~ (\x -> (x - 3)) & prepareRows)
     _ ->
       continue s
 
