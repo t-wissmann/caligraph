@@ -1,2 +1,8 @@
-main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+
+module Main where
+
+import UnicodeJunctionSpec
+
+main :: IO Int
+main =
+  runTester someLookups

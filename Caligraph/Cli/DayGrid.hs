@@ -102,8 +102,8 @@ renderDay st day2widget day =
       if day == boldDay || addDays (-1) day == boldDay
       then withBorderStyle unicodeBold vBorder
       else vBorder
-    junctionStyle' =[ "┼", "┏", "┓", "┗", "┛" ]
-    junctionStyle = [ "┼", "╆", "╅", "╄", "╃" ]
+    junctionStyle =[ "┼", "┏", "┓", "┗", "┛" ]
+    junctionStyle' = [ "┼", "╆", "╅", "╄", "╃" ]
     tlCorner = (!!) junctionStyle $
       if day == boldDay then 1 else
       if addDays (-1) day == boldDay then 2 else
