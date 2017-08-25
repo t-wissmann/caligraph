@@ -19,6 +19,7 @@ library
     Caligraph.Remind.Parser
     Caligraph.Remind.Types
     Caligraph.Cli.Main
+    Caligraph.Cli.DayGrid
   build-depends:
       base
     , parsec
