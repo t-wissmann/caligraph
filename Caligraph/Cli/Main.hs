@@ -17,6 +17,7 @@ import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 
 import Data.Time.Calendar
+import Data.Time.Format (formatTime, defaultTimeLocale)
 import qualified Graphics.Vty as V
 import Graphics.Vty.Attributes
 import Graphics.Vty.Input.Events
@@ -56,7 +57,7 @@ gotoToday s =
 
 
 day2widget :: Day -> Widget n
-day2widget day = str (show day)
+day2widget day = str (formatTime defaultTimeLocale "%d. %b %Y" day)
 
 
 
@@ -80,8 +81,8 @@ mainApp =
       , appHandleEvent = myHandleEvent
       , appStartEvent = (\s -> tryEnableMouse >> return s)
       , appAttrMap = const $ attrMap defAttr
-        [ ("today", fg red)
-        , ("focusDay", bg black)
+        [ ("focusDay", bg black)
+        , ("cellBorder", fg white)
         ]
       }
 

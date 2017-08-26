@@ -73,55 +73,74 @@ render :: (Ord n, Show n)
   -- ^- Internal State
   -> Widget n
   -- ^ Rendered widget
-render day2widget s =
-  (s^.rows)
+render day2widget st =
+  (st^.rows)
   & map (\(days,height,cb) ->
-        map (renderDay s day2widget) days
+        map (renderDay st day2widget) days
+        & flip (++) [renderRightmostBorder st $ last days]
         & map (setAvailableSize (daywidth,height))
         & map (cropBottomBy cb)
         & hBox
         )
-  & mapHead (cropTopBy (s^.scrollOffset))
+  & mapHead (cropTopBy (st^.scrollOffset))
   & vBox
-  where (fullwidth,_) = s^.size
+  where (fullwidth,_) = st^.size
         daywidth = (fullwidth - 1) `div` 7
         mapHead _ [] = []
         mapHead f (x:xs) = (f x:xs)
 
 data Surrounding celltype = Surrounding
-  { nNeighbour :: Maybe celltype -- North
-  , nwNeighour :: Maybe celltype -- North west neighbour
+  { nwNeighour :: Maybe celltype -- north west neighbour
+  , nNeighbour :: Maybe celltype -- north
+  , neNeighbour :: Maybe celltype -- north east neighbour
   , wNeighbour :: Maybe celltype -- west neighbour
   } deriving (Functor)
 
 surroundingDays :: St -> Day -> Surrounding Day
 surroundingDays _ day =
-  Surrounding n nw w
+  fmap (flip addDays day) $
+  case dayOfWeek of
+    1 -> s Nothing (Just (-7)) (Just (-6)) Nothing
+    7 -> s (Just (-8)) (Just (-7)) Nothing (Just (-1))
+    _ -> s (Just (-8)) (Just (-7)) (Just (-6)) (Just (-1))
   where
+    s = Surrounding
     (_,_,dayOfWeek) = toWeekDate day
-    n = Just $ addDays (-7) day
-    [nw,w] =
-      case dayOfWeek of
-        1 -> [Nothing,Nothing]
-        _ -> map Just $ map (\x -> addDays x day) [-8,-1]
+
+maybeOr :: Maybe Bool -> Maybe Bool -> Maybe Bool
+maybeOr (Just True) _  = Just True
+maybeOr _ (Just True)  = Just True
+maybeOr (Just False) _ = Just False
+maybeOr _ (Just False) = Just False
+maybeOr _ _            = Nothing
 
 renderDay :: St -> (Day -> Widget n) -> Day -> Widget n
 renderDay st day2widget day =
-  ((topleftJunction <+> UnicodeJunction.withLineType topBorder hBorder)
-    <=> (UnicodeJunction.withLineType leftBorder vBorder
+  ((topleftJunction <+> topBorderWidget)
+    <=> (leftBorderWidget
          <+> ((if day == blackBgDay then withAttr "focusDay" else id) $
                         day2widget day
         <=> fill ' ')))
   where
     boldDay = st^.focusDay
     blackBgDay = st^.today
+    surrounding_days =
+      fmap ((==) boldDay) $ surroundingDays st day
     thisDayBold = Just $ day == boldDay
-    (Surrounding north northwest west) = fmap ((==) boldDay) $ surroundingDays st day
-    maybeOr (Just True) _  = Just True
-    maybeOr _ (Just True)  = Just True
-    maybeOr (Just False) _ = Just False
-    maybeOr _ (Just False) = Just False
-    maybeOr _ _            = Nothing
+    (leftBorderWidget, topleftJunction, topBorderWidget) =
+      renderBorder st thisDayBold surrounding_days
+
+renderBorder
+  :: St
+  -> Maybe Bool
+  -- ^- wether this day is bold, or Nothing if 'this day' does not exist
+  -> Surrounding Bool
+  -- ^- whether the surrounding days are bold
+  -> (Widget n, Widget n, Widget n)
+  -- ^- the widgets for the left border, the topright junction, and the top border
+renderBorder st thisDayBold (Surrounding northwest north _ west) =
+  (leftBorderWidget, topleftJunction, topBorderWidget)
+  where
     topBorder =
       UnicodeJunction.fromMaybeBold $ thisDayBold `maybeOr` north
     leftBorderOfNorth = -- the style of the left border of the northern neighbour
@@ -130,10 +149,35 @@ renderDay st day2widget day =
       UnicodeJunction.fromMaybeBold $ west `maybeOr` northwest
     leftBorder =
       UnicodeJunction.fromMaybeBold $ thisDayBold `maybeOr` west
+    topBorderWidget =
+      hBorder
+      & UnicodeJunction.withLineType topBorder
+      & forceAttr "cellBorder"
+    leftBorderWidget =
+      vBorder
+      & UnicodeJunction.withLineType leftBorder
+      & forceAttr "cellBorder"
     topleftJunction =
       str [UnicodeJunction.get
               leftBorderOfNorth topBorder
               leftBorder topBorderOfWest]
+      & forceAttr "cellBorder"
+
+renderRightmostBorder
+  :: St
+  -- ^ the current state
+  -> Day
+  -- ^ the last day in the row
+  -> Widget n
+renderRightmostBorder st day =
+  (j <=> lb)
+  where
+    boldDay = st^.focusDay
+    thisDayBold = Just $ day == boldDay
+    (Surrounding _ n' ne' _) =
+      fmap ((==) boldDay) $ surroundingDays st day
+    shifted_surroundings = Surrounding n' ne' Nothing thisDayBold
+    (lb,j,_) = renderBorder st Nothing shifted_surroundings
 
 scrollToFocus :: St -> St
 scrollToFocus st =
