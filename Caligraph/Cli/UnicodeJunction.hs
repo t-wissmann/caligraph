@@ -1,12 +1,29 @@
 
 module Caligraph.Cli.UnicodeJunction where
-
+import Brick.Widgets.Border.Style (unicode, unicodeBold,BorderStyle(BorderStyle))
+import Brick.Widgets.Core (withBorderStyle)
+import qualified Brick.Types as BT
 import Data.List (find)
 data LineType =
     Empty
   | Normal
   | Strong
   deriving (Eq,Show,Enum)
+
+
+fromMaybeBold :: Maybe Bool -> LineType
+fromMaybeBold Nothing = Empty
+fromMaybeBold (Just False) = Normal
+fromMaybeBold (Just True) = Strong
+
+toBorderStyle :: LineType -> BorderStyle
+toBorderStyle Empty = BorderStyle ' ' ' ' ' ' ' ' ' ' ' ' ' ' ' ' ' ' ' ' ' '
+toBorderStyle Normal = unicode
+toBorderStyle Strong = unicodeBold
+
+withLineType :: LineType -> BT.Widget n -> BT.Widget n
+withLineType lt w = withBorderStyle (toBorderStyle lt) w
+
 
 char2lineType ch =
   case ch of
@@ -33,7 +50,7 @@ raw_characters =
   , "┐  --" , "┑  -_" , "┒  _-" , "┓  __"
   , "└--  " , "┕-_  " , "┖_-  " , "┗__  "
   , "┘-  -" , "┙-  _" , "┚_  -" , "┛_  _"
-  , "├--- " , "┝-_- " , "┞__- " , "┟--_ "
+  , "├--- " , "┝-_- " , "┞_-- " , "┟--_ "
   , "┠_-_ " , "┡__- " , "┢-__ " , "┣___ "
   , "┤- --" , "┥- -_" , "┦_ --" , "┧- _-"
   , "┨_ _-" , "┩_ -_" , "┪- __" , "┫_ __"

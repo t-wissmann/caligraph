@@ -99,12 +99,10 @@ myHandleEvent s (VtyEvent e) =
                   & DayGrid.scrollToFocus)
     EvMouseDown _ _ BScrollDown _ ->
       continue (s & DayGrid.scrollOffset %~ ((+) 3)
-                  & DayGrid.computeVisibleRows
-                  & DayGrid.scrollToFocus)
+                  & DayGrid.computeVisibleRows)
     EvMouseDown _ _ BScrollUp _ ->
       continue (s & DayGrid.scrollOffset %~ (\x -> (x - 3))
-                  & DayGrid.computeVisibleRows
-                  & DayGrid.scrollToFocus)
+                  & DayGrid.computeVisibleRows)
     _ ->
       continue s
 

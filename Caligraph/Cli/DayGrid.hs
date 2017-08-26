@@ -1,7 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Caligraph.Cli.DayGrid where
+
+import qualified Caligraph.Cli.UnicodeJunction as UnicodeJunction
 
 import Brick
 import Brick.Widgets.Border
@@ -81,35 +84,56 @@ render day2widget s =
   & mapHead (cropTopBy (s^.scrollOffset))
   & vBox
   where (fullwidth,_) = s^.size
-        daywidth = fullwidth `div` 7
+        daywidth = (fullwidth - 1) `div` 7
         mapHead _ [] = []
         mapHead f (x:xs) = (f x:xs)
 
+data Surrounding celltype = Surrounding
+  { nNeighbour :: Maybe celltype -- North
+  , nwNeighour :: Maybe celltype -- North west neighbour
+  , wNeighbour :: Maybe celltype -- west neighbour
+  } deriving (Functor)
+
+surroundingDays :: St -> Day -> Surrounding Day
+surroundingDays _ day =
+  Surrounding n nw w
+  where
+    (_,_,dayOfWeek) = toWeekDate day
+    n = Just $ addDays (-7) day
+    [nw,w] =
+      case dayOfWeek of
+        1 -> [Nothing,Nothing]
+        _ -> map Just $ map (\x -> addDays x day) [-8,-1]
+
 renderDay :: St -> (Day -> Widget n) -> Day -> Widget n
 renderDay st day2widget day =
-  ((str tlCorner <+> topBorder)
-    <=> (leftBorder <+> ((if day == blackBgDay then withAttr "focusDay" else id) $
+  ((topleftJunction <+> UnicodeJunction.withLineType topBorder hBorder)
+    <=> (UnicodeJunction.withLineType leftBorder vBorder
+         <+> ((if day == blackBgDay then withAttr "focusDay" else id) $
                         day2widget day
         <=> fill ' ')))
   where
-    boldDay = st^.today
-    blackBgDay = st^.focusDay
+    boldDay = st^.focusDay
+    blackBgDay = st^.today
+    thisDayBold = Just $ day == boldDay
+    (Surrounding north northwest west) = fmap ((==) boldDay) $ surroundingDays st day
+    maybeOr (Just True) _  = Just True
+    maybeOr _ (Just True)  = Just True
+    maybeOr (Just False) _ = Just False
+    maybeOr _ (Just False) = Just False
+    maybeOr _ _            = Nothing
     topBorder =
-      if day == boldDay || addDays (-7) day == boldDay
-      then withBorderStyle unicodeBold hBorder
-      else hBorder
+      UnicodeJunction.fromMaybeBold $ thisDayBold `maybeOr` north
+    leftBorderOfNorth = -- the style of the left border of the northern neighbour
+      UnicodeJunction.fromMaybeBold $ north `maybeOr` northwest
+    topBorderOfWest = -- the style of the top border of the western neighbour
+      UnicodeJunction.fromMaybeBold $ west `maybeOr` northwest
     leftBorder =
-      if day == boldDay || addDays (-1) day == boldDay
-      then withBorderStyle unicodeBold vBorder
-      else vBorder
-    junctionStyle =[ "┼", "┏", "┓", "┗", "┛" ]
-    junctionStyle' = [ "┼", "╆", "╅", "╄", "╃" ]
-    tlCorner = (!!) junctionStyle $
-      if day == boldDay then 1 else
-      if addDays (-1) day == boldDay then 2 else
-      if addDays (-7) day == boldDay then 3 else
-      if addDays (-8) day == boldDay then 4 else
-      0
+      UnicodeJunction.fromMaybeBold $ thisDayBold `maybeOr` west
+    topleftJunction =
+      str [UnicodeJunction.get
+              leftBorderOfNorth topBorder
+              leftBorder topBorderOfWest]
 
 scrollToFocus :: St -> St
 scrollToFocus st =
