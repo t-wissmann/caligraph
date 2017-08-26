@@ -197,8 +197,9 @@ scrollToFocus st =
     Just (_,(_,_,0)) ->
       st
     -- if it is cropped at the bottom, then scroll to the top accordingly
+    -- the 1 is for the southern border of the focused cell
     Just (_,(_,_,cb)) ->
-      st & scrollOffset %~ (\o -> o + cb) & computeVisibleRows
+      st & scrollOffset %~ (\o -> o + cb + 1) & computeVisibleRows
     -- if the focused day is not among the rows at all, then find out whether we
     -- need to go to the future or past
     Nothing ->
