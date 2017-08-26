@@ -27,7 +27,7 @@ raw_characters =
   --  - the line type to the east cell
   --  - the line type to the south cell
   --  - the line type to the west cell
-  -- 
+  --
   [ "─ - -" , "━ _ _" , "│- - " , "┃_ _ "
   , "┌ -- " , "┍ _- " , "┎ -_ " , "┏ __ "
   , "┐  --" , "┑  -_" , "┒  _-" , "┓  __"

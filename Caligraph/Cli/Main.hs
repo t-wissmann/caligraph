@@ -95,15 +95,15 @@ myHandleEvent s (VtyEvent e) =
         Nothing -> continue s
     EvResize w h ->
       continue (s & DayGrid.size .~ (w,h)
-                  & DayGrid.prepareRows
+                  & DayGrid.computeVisibleRows
                   & DayGrid.scrollToFocus)
     EvMouseDown _ _ BScrollDown _ ->
       continue (s & DayGrid.scrollOffset %~ ((+) 3)
-                  & DayGrid.prepareRows
+                  & DayGrid.computeVisibleRows
                   & DayGrid.scrollToFocus)
     EvMouseDown _ _ BScrollUp _ ->
       continue (s & DayGrid.scrollOffset %~ (\x -> (x - 3))
-                  & DayGrid.prepareRows
+                  & DayGrid.computeVisibleRows
                   & DayGrid.scrollToFocus)
     _ ->
       continue s

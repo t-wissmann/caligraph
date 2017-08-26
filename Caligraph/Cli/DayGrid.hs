@@ -46,7 +46,7 @@ init
   -- ^ today
   -> St
 init size d =
-  prepareRows $ St 0 d d d size []
+  computeVisibleRows $ St 0 d d d size []
 
 getToday :: IO Day
       -- ^ today
@@ -118,7 +118,7 @@ scrollToFocus st =
     Just (0,(_,_,0)) ->
       -- focusDay is only fully visible if we do not have any scroll ofset
       if (st^.scrollOffset > 0)
-      then st & scrollOffset .~ 0 & prepareRows
+      then st & scrollOffset .~ 0 & computeVisibleRows
       else st
     -- if the focus day is in the first row but this row is cropped at the bottom
     -- then the screen is too small and we can't do anything
@@ -130,7 +130,7 @@ scrollToFocus st =
       st
     -- if it is cropped at the bottom, then scroll to the top accordingly
     Just (_,(_,_,cb)) ->
-      st & scrollOffset %~ (\o -> o + cb) & prepareRows
+      st & scrollOffset %~ (\o -> o + cb) & computeVisibleRows
     -- if the focused day is not among the rows at all, then find out whether we
     -- need to go to the future or past
     Nothing ->
@@ -138,23 +138,23 @@ scrollToFocus st =
       -- if focused day is in the future
       then st & scrollDay .~ (st^.focusDay)
               & scrollOffset .~ (daysHeight st (weekOf (st^.focusDay)) - (snd $ st^.size))
-              & prepareRows
+              & computeVisibleRows
       -- if focused day is in the past
       else st & scrollDay .~ st^.focusDay
               & scrollOffset .~ 0
-              & prepareRows
+              & computeVisibleRows
 
-prepareRows :: St -> St
-prepareRows st =
+computeVisibleRows :: St -> St
+computeVisibleRows st =
   if (st^.scrollOffset < 0)
   then st & scrollDay %~ (addDays (-7))
           & (\s -> s & scrollOffset %~ (\x -> x + weekHeight s))
-          & prepareRows
+          & computeVisibleRows
   else
     if (st^.scrollOffset >= weekHeight st)
     then st & scrollDay %~ (addDays (7))
             & (\s -> s & scrollOffset %~ (\x -> x - weekHeight st))
-            & prepareRows
+            & computeVisibleRows
     else
     st & rows .~ new_rows_around (st^.scrollDay) (st^.scrollOffset)
   where
