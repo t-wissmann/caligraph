@@ -60,8 +60,16 @@ binds = Map.fromList
   where c f = (\st -> continue (st & dayGrid %~ f))
 
 
-day2widget :: Day -> Widget n
-day2widget day = str (formatTime defaultTimeLocale "%d. %b %Y" day)
+day2widget :: St -> Day -> Widget n
+day2widget st day =
+    str (formatTime defaultTimeLocale "%d. %b %Y" day)
+    <=> str (reminders)
+    where
+      reminders =
+        B.query (st^.backend) day
+        & concatMap (\x -> B.incarnations x day day)
+        & length
+        & show
 
 
 
@@ -80,7 +88,7 @@ tryEnableMouse = do
 
 mainApp :: App St () ()
 mainApp =
-  App { appDraw = (\s -> [DayGrid.render day2widget $ s^.dayGrid])
+  App { appDraw = (\s -> [DayGrid.render (day2widget s) $ s^.dayGrid])
       , appChooseCursor = const $ const Nothing
       , appHandleEvent = myHandleEvent
       , appStartEvent = (\s -> tryEnableMouse >> return s)

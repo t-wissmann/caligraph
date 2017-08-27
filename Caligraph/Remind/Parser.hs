@@ -10,6 +10,7 @@ import Text.ParserCombinators.Parsec.Token
 import qualified Text.ParserCombinators.Parsec as P
 import Data.Maybe (catMaybes)
 import Lens.Micro ((&))
+import Control.Monad.Identity
 
 int :: GenParser Char st Int
 int = read <$> many1 digit
@@ -99,13 +100,18 @@ rem = do
   return (REM args m)
 
 remArg :: GenParser Char st RemArg
-remArg = do
-  (fmap Date_spec $ try date)
-  <|> (fmap Delta $ try offset)
-  <|> (fmap Repeat $ try (char '*') >> int)
-  <|> (fmap AT $ try (string "AT" >> many1 space) >> time)
-  <|> (fmap DURATION $ try (string "DURATION" >> many1 space) >> time)
-  <|> (fmap UNTIL $ try (string "UNTIL" >> many1 space) >> date)
+remArg =
+  (into Date_spec $ try date)
+  <|> (into Delta $ try offset)
+  <|> (into Repeat $ try (char '*') >> int)
+  <|> (into AT $ try (string "AT" >> many1 space) >> time)
+  <|> (into DURATION $ try (string "DURATION" >> many1 space) >> time)
+  <|> (into UNTIL $ try (string "UNTIL" >> many1 space) >> date)
+  where
+    into :: (Identity a -> RemArg)
+         -> GenParser Char st a
+         -> GenParser Char st RemArg
+    into f = fmap (f . Identity)
 
 
 fset :: GenParser Char st String

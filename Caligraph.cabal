@@ -33,6 +33,8 @@ library
     , microlens
     , microlens-th
     , terminal-size
+    , mtl
+    , contravariant
   default-language:    Haskell2010
 
 executable caligraph

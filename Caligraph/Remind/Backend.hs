@@ -10,8 +10,12 @@ import qualified Caligraph.Backend as CB
 algorithm :: REM -> CB.Item
 algorithm (REM args msg) = CB.Item
   { CB.lifetime = (Nothing,Nothing)
-  , CB.incarnations = \f t -> []
+  , CB.incarnations = incs
   }
+  where
+    -- start_date = filter (
+    --    ) args
+    incs f t = []
 
 init :: String -> IO CB.Backend
 init path = do
