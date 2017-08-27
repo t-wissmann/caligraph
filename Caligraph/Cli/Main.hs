@@ -9,6 +9,7 @@ import Brick.Main
 import Brick.Widgets.Core (withAttr, cropTopBy, cropBottomBy,setAvailableSize)
 import Brick.AttrMap (attrMap, AttrMap)
 import Brick.Widgets.Border.Style
+import Brick.Widgets.Center (hCenter)
 
 import qualified Caligraph.Cli.DayGrid as DayGrid
 import Caligraph.Cli.DayGrid (Dir(DirUp,DirDown,DirLeft,DirRight))
@@ -62,15 +63,29 @@ binds = Map.fromList
 
 day2widget :: St -> Day -> Widget n
 day2widget st day =
-    str (formatTime defaultTimeLocale "%d. %b %Y" day)
+    (withAttr headerAttr $
+        hCenter $
+            str $ formatTime defaultTimeLocale day_format day)
     <=> reminders
     where
+      today = st^.dayGrid^.DayGrid.today
+      focus = st^.dayGrid^.DayGrid.focusDay
+      headerAttr
+        | day == focus && day == today = "cellHeaderFocusToday"
+        | day == focus  = "cellHeaderFocus"
+        | day == today  = "cellHeaderToday"
+        | otherwise     = "cellHeader"
+      (y,_,_) = toGregorian day
+      (y_now,_,_) = toGregorian today
+      day_format =
+        if y == y_now then "%d. %b" else "%d. %b %Y"
       reminders =
         CB.query (st^.backend) day
         & concatMap (\x -> CB.incarnations x day day)
         & map reminderWidget
         & vBox
       reminderWidget r =
+        str " " <=>
         str (CB.title r)
 
 
@@ -95,8 +110,11 @@ mainApp =
       , appHandleEvent = myHandleEvent
       , appStartEvent = (\s -> tryEnableMouse >> return s)
       , appAttrMap = const $ attrMap defAttr
-        [ ("focusDay", bg black)
-        , ("cellBorder", fg white)
+        [ ("cellBorder", fg white)
+        , ("cellHeader", fg white)
+        , ("cellHeaderFocus", defAttr)
+        , ("cellHeaderToday", white `on` black)
+        , ("cellHeaderFocusToday", bg black)
         ]
       }
 
