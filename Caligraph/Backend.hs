@@ -10,7 +10,7 @@ data Incarnation = Incarnation
   , duration :: Maybe (Int,Int)
   , title :: String
   -- , TODO: a timezone
-  }
+  } deriving (Eq,Show)
 
 data Item = Item
   { lifetime :: (Maybe Day, Maybe Day)
@@ -28,13 +28,12 @@ data Backend = Backend
 inLifetime :: Day -> (Maybe Day, Maybe Day) -> Bool
 inLifetime d (ml,mr) =
     (case mr of
-      Just r -> d `before` r
+      Just r -> d <= r
       Nothing -> True)
     &&
     (case ml of
-      Just l -> l `before` d
+      Just l -> l <= d
       Nothing -> True)
-    where before d1 d2 = diffDays d1 d2 >= 0
 
 query :: Backend -> Day -> [Item]
 query be day =

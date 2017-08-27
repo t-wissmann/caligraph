@@ -11,9 +11,13 @@ import qualified Text.ParserCombinators.Parsec as P
 import Data.Maybe (catMaybes)
 import Lens.Micro ((&))
 import Control.Monad.Identity
+import Data.Time.Calendar (Day)
 
 int :: GenParser Char st Int
 int = read <$> many1 digit
+
+parseInteger :: GenParser Char st Integer
+parseInteger = read <$> many1 digit
 
 
 rfLine :: GenParser Char st RFLine
@@ -46,7 +50,7 @@ dateUS :: GenParser Char st PartialDate
 dateUS = do
   m <- optionMaybe month
   many1 space
-  y <- optionMaybe int
+  y <- optionMaybe parseInteger
   many1 space
   d <- optionMaybe int
   return $ PartialDate {
@@ -57,7 +61,7 @@ dateUS = do
 
 dateISO :: GenParser Char st PartialDate
 dateISO = do
-  y <- int
+  y <- parseInteger
   char '-'
   m <- int
   char '-'
@@ -68,22 +72,29 @@ dateISO = do
     pyear = Just y
   }
 
-date :: GenParser Char st PartialDate
-date = do
+partialdate :: GenParser Char st PartialDate
+partialdate = do
   spaces
   (try dateISO <|> try dateUS)
+
+parseDay :: GenParser Char st Day
+parseDay = do
+    pd <- partialdate
+    case (isFullDate pd) of
+        Just day -> return day
+        Nothing -> fail "full day required"
 
 offset :: GenParser Char st Int
 offset = do
   spaces
   (char '+' >> int) <|> (char '-' >> (fmap (* (-1)) int))
 
-time :: GenParser Char st Time
+time :: GenParser Char st (Int,Int)
 time = do
   h <- int
   char ':'
   m <- int
-  return $ Time h m
+  return $ (h,m)
 
 msg :: GenParser Char st String
 msg = do
@@ -101,12 +112,12 @@ rem = do
 
 remArg :: GenParser Char st RemArg
 remArg =
-  (into Date_spec $ try date)
+  (into Date_spec $ try partialdate)
   <|> (into Delta $ try offset)
   <|> (into Repeat $ try (char '*') >> int)
   <|> (into AT $ try (string "AT" >> many1 space) >> time)
   <|> (into DURATION $ try (string "DURATION" >> many1 space) >> time)
-  <|> (into UNTIL $ try (string "UNTIL" >> many1 space) >> date)
+  <|> (into UNTIL $ try (string "UNTIL" >> many1 space) >> parseDay)
   where
     into :: (Identity a -> RemArg)
          -> GenParser Char st a

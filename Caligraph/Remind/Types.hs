@@ -9,7 +9,9 @@ module Caligraph.Remind.Types where
 
 import Data.Functor.Classes
 import Control.Monad.Identity
-import Data.Functor.Contravariant (Op(getOp))
+import Data.Functor.Contravariant (Op(Op,getOp))
+import Data.Maybe
+import Data.Time.Calendar (Day,fromGregorianValid)
 
 data RFLine =
     Comment String
@@ -26,9 +28,9 @@ data RemArgT f =
   | Date_spec (f PartialDate)
   | Delta (f Int)
   | Repeat (f Int)
-  | AT (f Time)
-  | DURATION (f Time)
-  | UNTIL (f PartialDate)
+  | AT (f (Int,Int))
+  | DURATION (f (Int,Int))
+  | UNTIL (f Day)
 
 deriving instance Eq (RemArgT Identity)
 deriving instance Show (RemArgT Identity)
@@ -48,17 +50,33 @@ coApp q val = case (q,val) of
     (_, _) -> Nothing
     where j f y = Just $ getOp f $ runIdentity y
 
--- getRemArg :: (f () -> RemArgT f) ->
+getRemArg
+    :: (Op a a -> RemArgT (Op res))
+    -- ^ some constructor of RemArgT
+    -> RemArg -> Maybe res
+getRemArg constructor = coApp (constructor $ Op id)
 
-data Time = Time
-  { thour :: Int
-  , tmin :: Int
-  } deriving (Eq,Show)
+findRemArg
+    :: (Op a a -> RemArgT (Op res))
+    -- ^ some constructor of RemArgT
+    -> [RemArg]
+    -- ^ a list of arguments
+    -> Maybe res
+    -- ^ the parameter to the first element with the matching constructor
+findRemArg constr = listToMaybe . mapMaybe (getRemArg constr)
 
 data PartialDate = PartialDate
   { pday  :: Maybe Int
   , pmonth :: Maybe Int
-  , pyear :: Maybe Int
+  , pyear :: Maybe Integer
   } deriving (Eq,Show)
+
+flatPartialDate :: Maybe PartialDate -> PartialDate
+flatPartialDate = maybe (PartialDate Nothing Nothing Nothing) id
+
+isFullDate :: PartialDate -> Maybe Day
+isFullDate (PartialDate (Just d) (Just m) (Just y)) =
+    fromGregorianValid y m d
+isFullDate _ = Nothing
 
 

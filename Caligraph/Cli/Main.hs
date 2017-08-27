@@ -25,7 +25,7 @@ import Graphics.Vty.Input.Events
 import Graphics.Vty (outputIface)
 import Graphics.Vty.Output.Interface (supportsMode,Mode(Mouse),setMode)
 import qualified Data.Map.Strict as Map
-import qualified Caligraph.Backend as B
+import qualified Caligraph.Backend as CB
 import qualified Caligraph.Remind.Backend as Remind
 import System.Environment (getArgs)
 
@@ -34,7 +34,7 @@ import Lens.Micro.TH
 
 data St = St
     { _dayGrid :: DayGrid.St
-    , _backend :: B.Backend
+    , _backend :: CB.Backend
     }
 
 makeLenses ''St
@@ -63,13 +63,15 @@ binds = Map.fromList
 day2widget :: St -> Day -> Widget n
 day2widget st day =
     str (formatTime defaultTimeLocale "%d. %b %Y" day)
-    <=> str (reminders)
+    <=> reminders
     where
       reminders =
-        B.query (st^.backend) day
-        & concatMap (\x -> B.incarnations x day day)
-        & length
-        & show
+        CB.query (st^.backend) day
+        & concatMap (\x -> CB.incarnations x day day)
+        & map reminderWidget
+        & vBox
+      reminderWidget r =
+        str (CB.title r)
 
 
 
