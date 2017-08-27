@@ -5,10 +5,11 @@ module Caligraph.Remind.Parser where
 import Caligraph.Remind.Types
 
 import Prelude hiding (rem)
-import Text.ParserCombinators.Parsec
+import Text.ParserCombinators.Parsec hiding (parse)
 import Text.ParserCombinators.Parsec.Token
-import Text.ParserCombinators.Parsec as P
+import qualified Text.ParserCombinators.Parsec as P
 import Data.Maybe (catMaybes)
+import Lens.Micro ((&))
 
 int :: GenParser Char st Int
 int = read <$> many1 digit
@@ -148,11 +149,20 @@ groupLines =
         (_, res) -> (l1,str1) : res
 
 
-parse :: String -> IO [Either ParseError (Int,RFLine)]
-parse path = do
+parseFile :: String -> IO [Either ParseError (Int,RFLine)]
+parseFile path = do
   input <- readFile path
-  let lines = P.parse groupLines path input
-  return $ either (\x -> [Left x]) (map parseNumberedLine) lines
+  return $ parse path input
+
+parse
+  :: String
+  -- ^ the filepath/title for error messages
+  -> String
+  -- ^ the file's content
+  -> [Either ParseError (Int,RFLine)]
+parse path input =
+  P.parse groupLines path input
+  & either (\x -> [Left x]) (map parseNumberedLine)
   where
     mapSnd f (a,b) = (a,f b)
     offsetLine idx =  do

@@ -11,6 +11,7 @@ import Brick.AttrMap (attrMap, AttrMap)
 import Brick.Widgets.Border.Style
 
 import qualified Caligraph.Cli.DayGrid as DayGrid
+import Caligraph.Cli.DayGrid (Dir(DirUp,DirDown,DirLeft,DirRight))
 
 
 import Control.Monad (when)
@@ -24,36 +25,39 @@ import Graphics.Vty.Input.Events
 import Graphics.Vty (outputIface)
 import Graphics.Vty.Output.Interface (supportsMode,Mode(Mouse),setMode)
 import qualified Data.Map.Strict as Map
+import qualified Caligraph.Backend as B
+import qualified Caligraph.Remind.Backend as Remind
+import System.Environment (getArgs)
 
 import Lens.Micro
 import Lens.Micro.TH
 
-type State = DayGrid.St
+data St = St
+    { _dayGrid :: DayGrid.St
+    , _backend :: B.Backend
+    }
+
+makeLenses ''St
 
 
-
+binds :: Map.Map Key (St -> EventM () (Next St))
 binds = Map.fromList
   [ (KEsc, halt)
   , (KChar 'q', halt)
-  , (KChar 'o', gotoToday)
+  , (KChar 'o', c $ DayGrid.gotoToday)
 
   -- hjkl
-  , (KChar 'h', switchDay (-1))
-  , (KChar 'j', switchDay  7)
-  , (KChar 'k', switchDay (-7))
-  , (KChar 'l', switchDay  1)
+  , (KChar 'h', c $ DayGrid.moveFocus DirLeft)
+  , (KChar 'j', c $ DayGrid.moveFocus DirDown)
+  , (KChar 'k', c $ DayGrid.moveFocus DirUp)
+  , (KChar 'l', c $ DayGrid.moveFocus DirRight)
   -- arrow keys
-  , (KLeft , switchDay (-1))
-  , (KDown , switchDay  7)
-  , (KUp   , switchDay (-7))
-  , (KRight, switchDay  1)
+  , (KLeft , c $ DayGrid.moveFocus DirLeft)
+  , (KDown , c $ DayGrid.moveFocus DirDown)
+  , (KUp   , c $ DayGrid.moveFocus DirUp)
+  , (KRight, c $ DayGrid.moveFocus DirRight)
   ]
-
-switchDay delta s =
-  continue (s & DayGrid.focusDay %~ addDays delta & DayGrid.scrollToFocus)
-
-gotoToday s =
-  continue (s & DayGrid.focusDay .~ (s^.DayGrid.today) & DayGrid.scrollToFocus)
+  where c f = (\st -> continue (st & dayGrid %~ f))
 
 
 day2widget :: Day -> Widget n
@@ -74,9 +78,9 @@ tryEnableMouse = do
   return ()
 
 
-mainApp :: App State () ()
+mainApp :: App St () ()
 mainApp =
-  App { appDraw = (\s -> [DayGrid.render day2widget s])
+  App { appDraw = (\s -> [DayGrid.render day2widget $ s^.dayGrid])
       , appChooseCursor = const $ const Nothing
       , appHandleEvent = myHandleEvent
       , appStartEvent = (\s -> tryEnableMouse >> return s)
@@ -86,6 +90,7 @@ mainApp =
         ]
       }
 
+myHandleEvent :: St -> BrickEvent () () -> EventM () (Next St)
 myHandleEvent s (VtyEvent e) =
   case e of
     EvKey KEsc mods ->
@@ -95,15 +100,11 @@ myHandleEvent s (VtyEvent e) =
         Just cb -> cb s
         Nothing -> continue s
     EvResize w h ->
-      continue (s & DayGrid.size .~ (w,h)
-                  & DayGrid.computeVisibleRows
-                  & DayGrid.scrollToFocus)
+      continue (s & dayGrid %~ DayGrid.resize (w,h))
     EvMouseDown _ _ BScrollDown _ ->
-      continue (s & DayGrid.scrollOffset %~ ((+) 3)
-                  & DayGrid.computeVisibleRows)
+      continue (s & dayGrid %~ DayGrid.scroll 3)
     EvMouseDown _ _ BScrollUp _ ->
-      continue (s & DayGrid.scrollOffset %~ (\x -> (x - 3))
-                  & DayGrid.computeVisibleRows)
+      continue (s & dayGrid %~ DayGrid.scroll (-3))
     _ ->
       continue s
 
@@ -120,6 +121,8 @@ testmain = do
         return v
   size <- DayGrid.getScreenSize
   today <- DayGrid.getToday
-  customMain buildVty Nothing mainApp (DayGrid.init size today)
+  args <- getArgs
+  backend <- Remind.init (args !! 0)
+  customMain buildVty Nothing mainApp (St (DayGrid.init size today) backend)
   return ()
 

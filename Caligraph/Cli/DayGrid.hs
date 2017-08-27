@@ -253,5 +253,36 @@ daysHeight s ds = foldr max 0 $ map (dayHeight s) ds
 dayHeight :: St -> Day -> Int
 dayHeight _ _ = 20
 
+scroll :: Int -> St -> St
+scroll delta s = s
+      & scrollOffset %~ ((+) delta)
+      & computeVisibleRows
+
+resize :: (Int,Int) -> St -> St
+resize (w,h) s = s
+    & size .~ (w,h)
+    & computeVisibleRows
+    & scrollToFocus
+
+
+data Dir = DirUp | DirDown | DirLeft  | DirRight
+dayInDirecton :: St -> Dir -> Day
+dayInDirecton st dir =
+    flip addDays (st^.focusDay) $
+    case dir of
+        DirUp -> (-7)
+        DirDown -> 7
+        DirLeft -> (-1)
+        DirRight -> 1
+
+moveFocus :: Dir -> St -> St
+moveFocus d st =
+    st & focusDay .~ dayInDirecton st d
+       & scrollToFocus
+
+
+gotoToday :: St -> St
+gotoToday st =
+    st & focusDay .~ (st^.today) & scrollToFocus
 
 

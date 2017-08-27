@@ -11,7 +11,7 @@ import System.Environment
 mainOld :: IO ()
 mainOld = do
   args <- getArgs
-  p <- parse (args !! 0)
+  p <- parseFile (args !! 0)
   forM_ p $ \x -> case x of
     Left e -> do putStr ("Error parsing ")
                  print e

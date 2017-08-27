@@ -16,8 +16,10 @@ cabal-version:       >=1.10
 library
   exposed-modules:
     Caligraph.Lib
+    Caligraph.Backend
     Caligraph.Remind.Parser
     Caligraph.Remind.Types
+    Caligraph.Remind.Backend
     Caligraph.Cli.Main
     Caligraph.Cli.DayGrid
     Caligraph.Cli.UnicodeJunction
