@@ -251,7 +251,7 @@ daysHeight :: St -> [Day] -> Int
 daysHeight s ds = foldr max 0 $ map (dayHeight s) ds
 
 dayHeight :: St -> Day -> Int
-dayHeight _ _ = 20
+dayHeight _ _ = 10
 
 scroll :: Int -> St -> St
 scroll delta s = s

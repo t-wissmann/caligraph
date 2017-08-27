@@ -4,6 +4,8 @@ module Caligraph.Backend where
 import Data.Time.Calendar (Day)
 import Data.Time.Calendar (Day,addDays,diffDays)
 
+import Text.Printf
+
 data Incarnation = Incarnation
   { day :: Day
   , time :: Maybe (Int,Int)
@@ -11,6 +13,10 @@ data Incarnation = Incarnation
   , title :: String
   -- , TODO: a timezone
   } deriving (Eq,Show)
+
+showTime :: (Int,Int) -> String
+showTime (h,m) =
+    printf "%2d:%02d" h m
 
 data Item = Item
   { lifetime :: (Maybe Day, Maybe Day)

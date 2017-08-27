@@ -86,7 +86,18 @@ day2widget st day =
         & vBox
       reminderWidget r =
         str " " <=>
-        str (CB.title r)
+        strWrap (
+            duration r
+            ++ CB.title r
+        )
+      duration r =
+        case (CB.time r, CB.duration r) of
+            (Just (h,m), Just (dh,dm)) ->
+                CB.showTime (h,m)
+                ++ "-" ++ CB.showTime (h+dh,h+dm) ++ " "
+            (Just (h,m), Nothing) ->
+                CB.showTime (h,m) ++ " "
+            (_, _) -> ""
 
 
 
@@ -111,10 +122,10 @@ mainApp =
       , appStartEvent = (\s -> tryEnableMouse >> return s)
       , appAttrMap = const $ attrMap defAttr
         [ ("cellBorder", fg white)
-        , ("cellHeader", fg white)
-        , ("cellHeaderFocus", defAttr)
-        , ("cellHeaderToday", white `on` black)
-        , ("cellHeaderFocusToday", bg black)
+        , ("cellHeader", yellow `on` black)
+        , ("cellHeaderFocus", yellow `on` black)
+        , ("cellHeaderToday", black `on` yellow)
+        , ("cellHeaderFocusToday", black `on` yellow)
         ]
       }
 
