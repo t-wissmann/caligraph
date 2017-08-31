@@ -30,7 +30,8 @@ data RemArgT f =
   | Repeat (f Int)
   | AT (f (Int,Int))
   | DURATION (f (Int,Int))
-  | UNTIL (f Day)
+  | Until (f Day)
+  | From (f Day)
 
 deriving instance Eq (RemArgT Identity)
 deriving instance Show (RemArgT Identity)
@@ -41,12 +42,13 @@ type RemArg = RemArgT Identity
 coApp :: RemArgT (Op a) -> RemArgT Identity -> Maybe a
 coApp q val = case (q,val) of
     (ONCE f,        ONCE x)         -> j f x
-    (DateSpec f,    DateSpec x)    -> j f x
+    (DateSpec f,    DateSpec x)     -> j f x
     (Delta f,       Delta x)        -> j f x
     (Repeat f,      Repeat x)       -> j f x
     (AT f,          AT x)           -> j f x
     (DURATION f,    DURATION x)     -> j f x
-    (UNTIL f,       UNTIL x)        -> j f x
+    (Until f,       Until x)        -> j f x
+    (From f,        From x)         -> j f x
     (_, _) -> Nothing
     where j f y = Just $ getOp f $ runIdentity y
 

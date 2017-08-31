@@ -117,7 +117,8 @@ remArg =
   <|> (into Repeat $ try (char '*') >> int)
   <|> (into AT $ try (string "AT" >> many1 space) >> time)
   <|> (into DURATION $ try (string "DURATION" >> many1 space) >> time)
-  <|> (into UNTIL $ try (string "UNTIL" >> many1 space) >> parseDay)
+  <|> (into Until $ try (string "UNTIL" >> many1 space) >> parseDay)
+  <|> (into From $ try (string "FROM" >> many1 space) >> parseDay)
   where
     into :: (Identity a -> RemArg)
          -> GenParser Char st a

@@ -90,8 +90,9 @@ incarnationsRepeat args firstDay repeat f t =
            day2repetitionIdx d = (fromIntegral $ d `diffDays` firstDay)
                                / (fromIntegral repeat)
            -- the index of the first repetition within in the interval
-           rep_from = max 0 (ceiling $ day2repetitionIdx f)
-           rep_end_day = min t $ fromMaybe t $ findRemArg UNTIL args
+           rep_start_day = max f $ fromMaybe f $ findRemArg From args
+           rep_from = max 0 (ceiling $ day2repetitionIdx rep_start_day)
+           rep_end_day = min t $ fromMaybe t $ findRemArg Until args
            -- the index of the last repetition within in the interval
            rep_to = max 0 (floor $ day2repetitionIdx rep_end_day)
 
@@ -100,10 +101,11 @@ repetitionLifeTime args pdate =
   case isFullDate pdate of
     Nothing -> partialDateLifeTime pdate
     Just startDate ->
-      (,) (Just startDate) $
       case findRemArg Repeat args of
-        Just r -> findRemArg UNTIL args
-        Nothing -> (Just startDate)
+        Just r ->
+          ( Just $ fromMaybe startDate $ findRemArg From args
+          , findRemArg Until args)
+        Nothing -> (Just startDate, Just startDate)
 
 partialDateLifeTime :: PartialDate -> (Maybe Day,Maybe Day)
 partialDateLifeTime pdate =
