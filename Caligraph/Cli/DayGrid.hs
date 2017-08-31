@@ -312,4 +312,11 @@ gotoToday :: St -> St
 gotoToday st =
     st & focusDay .~ (st^.today) & scrollToFocus
 
+rangeVisible :: St -> (Day,Day)
+rangeVisible st = fromMaybe (st^.scrollDay,st^.scrollDay) $ do
+    (first_row,_,_) <- listToMaybe (st^.rows)
+    (last_row,_,_) <- lastSafe (st^.rows)
+    first_day <- listToMaybe first_row
+    last_day <- lastSafe last_row
+    return (first_day, last_day)
 

@@ -5,6 +5,8 @@ import Data.Time.Calendar (Day)
 import Data.Time.Calendar (Day,addDays,diffDays)
 
 import Text.Printf
+import Data.Array
+import qualified Data.List as List
 
 data Incarnation = Incarnation
   { day :: Day
@@ -12,7 +14,7 @@ data Incarnation = Incarnation
   , duration :: Maybe (Int,Int)
   , title :: String
   -- , TODO: a timezone
-  } deriving (Eq,Show)
+  } deriving (Eq,Show,Ord)
 
 showTime :: (Int,Int) -> String
 showTime (h,m) =
@@ -31,18 +33,33 @@ data Backend = Backend
   -- , kk
   }
 
-inLifetime :: Day -> (Maybe Day, Maybe Day) -> Bool
-inLifetime d (ml,mr) =
+lifetimeIntersects
+  :: (Day,Day)
+  -- ^ closed interval
+  -> (Maybe Day, Maybe Day)
+  -- ^ possibly open interval
+  -> Bool
+  -- ^ whether the intervals intersect
+lifetimeIntersects (f,t) (ml,mr) =
     (case mr of
-      Just r -> d <= r
+      Just r -> f <= r
       Nothing -> True)
     &&
     (case ml of
-      Just l -> l <= d
+      Just l -> l <= t
       Nothing -> True)
 
-query :: Backend -> Day -> [Item]
-query be day =
-    filter (inLifetime day . lifetime) $ items be
+inLifetime :: Day -> (Maybe Day, Maybe Day) -> Bool
+inLifetime d range = lifetimeIntersects (d,d) range
+
+query :: Backend -> (Day,Day) -> Array Day [Incarnation]
+query be (from,to)
+    = accumArray (flip (:)) [] (from,to)
+    $ map (\x -> (day x, x))
+    $ filter (\i -> (day i) `inLifetime` (Just from, Just to))
+    $ concatMap (\i -> incarnations i from to)
+    $ filter (lifetimeIntersects (from,to) . lifetime)
+    $ items be
+    where same f x y = f x == f y
 
 

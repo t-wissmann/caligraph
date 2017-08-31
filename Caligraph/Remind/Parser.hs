@@ -112,7 +112,7 @@ rem = do
 
 remArg :: GenParser Char st RemArg
 remArg =
-  (into Date_spec $ try partialdate)
+  (into DateSpec $ try partialdate)
   <|> (into Delta $ try offset)
   <|> (into Repeat $ try (char '*') >> int)
   <|> (into AT $ try (string "AT" >> many1 space) >> time)

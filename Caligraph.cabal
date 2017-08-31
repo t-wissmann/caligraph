@@ -34,6 +34,7 @@ library
     , microlens
     , microlens-th
     , terminal-size
+    , array
     , mtl
     , contravariant
     , word-wrap

@@ -14,10 +14,13 @@ import Brick.Widgets.Center (hCenter)
 import qualified Caligraph.Cli.DayGrid as DayGrid
 import Caligraph.Cli.DayGrid (Dir(DirUp,DirDown,DirLeft,DirRight))
 
+import Caligraph.Utils
 
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Text.Wrap
+import Data.Array
+import Data.Maybe
 
 import Data.Time.Calendar
 import Data.Time.Format (formatTime, defaultTimeLocale)
@@ -30,6 +33,7 @@ import qualified Data.Map.Strict as Map
 import qualified Caligraph.Backend as CB
 import qualified Caligraph.Remind.Backend as Remind
 import System.Environment (getArgs)
+import Data.List (sort)
 
 import Lens.Micro
 import Lens.Micro.TH
@@ -67,8 +71,8 @@ binds = Map.fromList
   where c f = (\st -> continue (st & dayGrid %~ f))
 
 
-day2widget :: St -> Day -> Widget n
-day2widget st day =
+day2widget :: St -> Array Day [CB.Incarnation] -> Day -> Widget n
+day2widget st day_array day =
     (withAttr headerAttr $
         hCenter $
             str $ formatTime defaultTimeLocale day_format day)
@@ -86,8 +90,7 @@ day2widget st day =
       day_format =
         if y == y_now then "%d. %b" else "%d. %b %Y"
       reminders =
-        CB.query (st^.backend) day
-        & concatMap (\x -> CB.incarnations x day day)
+        (fromMaybe [] $ safeArray day_array day)
         & map reminderWidget
         & vBox
       reminderWidget r =
@@ -105,8 +108,11 @@ day2widget st day =
                 CB.showTime (h,m) ++ " "
             (_, _) -> ""
 
-
-
+ui st =
+  [DayGrid.render (day2widget st reminders) $ st^.dayGrid]
+  where
+    reminders =
+      CB.query (st^.backend) (DayGrid.rangeVisible $ st^.dayGrid)
 
 
 
@@ -122,7 +128,7 @@ tryEnableMouse = do
 
 mainApp :: App St () ()
 mainApp =
-  App { appDraw = (\s -> [DayGrid.render (day2widget s) $ s^.dayGrid])
+  App { appDraw = ui
       , appChooseCursor = const $ const Nothing
       , appHandleEvent = myHandleEvent
       , appStartEvent = (\s -> tryEnableMouse >> return s)
