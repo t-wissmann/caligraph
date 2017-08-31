@@ -6,6 +6,9 @@ module Caligraph.Cli.DayGrid where
 
 import qualified Caligraph.Cli.UnicodeJunction as UnicodeJunction
 
+import Caligraph.Utils
+import Data.Maybe
+
 import Brick
 import Brick.Widgets.Border
 import Brick.Main
@@ -253,10 +256,19 @@ daysHeight s ds = foldr max 0 $ map (dayHeight s) ds
 dayHeight :: St -> Day -> Int
 dayHeight _ _ = 10
 
+-- | scroll the viewport by terminal rows
 scroll :: Int -> St -> St
 scroll delta s = s
       & scrollOffset %~ ((+) delta)
       & computeVisibleRows
+
+-- | scroll the viewport by the given number of pages
+scrollPage :: Double -> St -> St
+scrollPage pages st =
+    st
+    & scroll (floor $ pages * (fromIntegral $ snd $ st^.size))
+    & moveFocusIntoView
+
 
 resize :: (Int,Int) -> St -> St
 resize (w,h) s = s
@@ -280,6 +292,21 @@ moveFocus d st =
     st & focusDay .~ dayInDirecton st d
        & scrollToFocus
 
+
+-- | update the focused cell s.t. it is in the view
+moveFocusIntoView :: St -> St
+moveFocusIntoView st =
+  st & focusDay .~ fromMaybe (st^.focusDay) (do
+    (first_row,_,_) <- listToMaybe (st^.rows)
+    (last_row,_,_) <- lastSafe (st^.rows)
+    first_day <- listToMaybe first_row
+    last_day <- lastSafe last_row
+    let (_,_,dayOfWeek) = toWeekDate (st^.focusDay)
+    if (st^.focusDay < first_day) then
+      return (addDays (toInteger dayOfWeek - 1) first_day)
+    else if (st^.focusDay > last_day) then
+        return (addDays (toInteger dayOfWeek - 7) last_day)
+      else Nothing) -- nothing needs to be changed
 
 gotoToday :: St -> St
 gotoToday st =

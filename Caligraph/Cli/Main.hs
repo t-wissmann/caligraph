@@ -17,6 +17,7 @@ import Caligraph.Cli.DayGrid (Dir(DirUp,DirDown,DirLeft,DirRight))
 
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
+import Text.Wrap
 
 import Data.Time.Calendar
 import Data.Time.Format (formatTime, defaultTimeLocale)
@@ -41,22 +42,27 @@ data St = St
 makeLenses ''St
 
 
-binds :: Map.Map Key (St -> EventM () (Next St))
+binds :: Map.Map ([Modifier],Key) (St -> EventM () (Next St))
 binds = Map.fromList
-  [ (KEsc, halt)
-  , (KChar 'q', halt)
-  , (KChar 'o', c $ DayGrid.gotoToday)
+  [ (([], KEsc), halt)
+  , (([], KChar 'q'), halt)
+  , (([], KChar 'o'), c $ DayGrid.gotoToday)
+
+  , (([MCtrl], KChar 'd'), c $ DayGrid.scrollPage 0.45)
+  , (([MCtrl], KChar 'u'), c $ DayGrid.scrollPage (-0.45))
+  , (([MCtrl], KChar 'f'), c $ DayGrid.scrollPage 0.90)
+  , (([MCtrl], KChar 'b'), c $ DayGrid.scrollPage (-0.90))
 
   -- hjkl
-  , (KChar 'h', c $ DayGrid.moveFocus DirLeft)
-  , (KChar 'j', c $ DayGrid.moveFocus DirDown)
-  , (KChar 'k', c $ DayGrid.moveFocus DirUp)
-  , (KChar 'l', c $ DayGrid.moveFocus DirRight)
+  , (([], KChar 'h'), c $ DayGrid.moveFocus DirLeft)
+  , (([], KChar 'j'), c $ DayGrid.moveFocus DirDown)
+  , (([], KChar 'k'), c $ DayGrid.moveFocus DirUp)
+  , (([], KChar 'l'), c $ DayGrid.moveFocus DirRight)
   -- arrow keys
-  , (KLeft , c $ DayGrid.moveFocus DirLeft)
-  , (KDown , c $ DayGrid.moveFocus DirDown)
-  , (KUp   , c $ DayGrid.moveFocus DirUp)
-  , (KRight, c $ DayGrid.moveFocus DirRight)
+  , (([], KLeft ), c $ DayGrid.moveFocus DirLeft)
+  , (([], KDown ), c $ DayGrid.moveFocus DirDown)
+  , (([], KUp   ), c $ DayGrid.moveFocus DirUp)
+  , (([], KRight), c $ DayGrid.moveFocus DirRight)
   ]
   where c f = (\st -> continue (st & dayGrid %~ f))
 
@@ -86,7 +92,7 @@ day2widget st day =
         & vBox
       reminderWidget r =
         str " " <=>
-        strWrap (
+        strWrapWith (WrapSettings False True) (
             duration r
             ++ CB.title r
         )
@@ -135,7 +141,7 @@ myHandleEvent s (VtyEvent e) =
     EvKey KEsc mods ->
       halt s
     EvKey key mods ->
-      case Map.lookup key binds of
+      case Map.lookup (mods,key) binds of
         Just cb -> cb s
         Nothing -> continue s
     EvResize w h ->
