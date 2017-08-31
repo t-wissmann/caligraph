@@ -20,36 +20,61 @@ algorithm (REM args msg) =
     startDatePartial =
       flatPartialDate $ findRemArg DateSpec args
     incs f t =
-        case isFullDate startDatePartial of
-          Nothing -> []
-          Just startDate ->
-             if t < startDate
-             then [] -- If the reminder is in the future
-             else
-               case (findRemArg Repeat args) of
-                  Just r ->
-                    [ CB.Incarnation
-                        d
-                        (findRemArg AT args)
-                        (findRemArg DURATION args)
-                        msg
-                    | d <- repetitionDays args startDate r f t
-                    ]
-                  Nothing ->
-                    -- no repetition
-                    [ CB.Incarnation
-                        startDate
-                        (findRemArg AT args)
-                        (findRemArg DURATION args)
-                        msg
-                    ]
+        [ CB.Incarnation
+            d
+            (findRemArg AT args)
+            (findRemArg DURATION args)
+            msg
+        | d <- incarnationDays args startDatePartial f t
+        ]
 
--- | on which days within an interval does a given reminder occur?
-repetitionDays
+incarnationDays
+  :: [RemArg]
+  -- ^ the reminder
+  -> PartialDate
+  -- ^ the (possibly partial) start date
+  -> Day
+  -- ^ the first day of the interval of interest
+  -> Day
+  -- ^ the last day of the interval of interest
+  -> [Day]
+  -- ^ the days within the interval on which the reminder occurs
+incarnationDays args startDatePartial f t =
+  case isFullDate startDatePartial of
+    Nothing -> incarnationsPartial args startDatePartial f t
+    Just startDate ->
+       if t < startDate
+       then [] -- If the reminder is in the future
+       else
+         case (findRemArg Repeat args) of
+            Just r ->
+              incarnationsRepeat args startDate r f t
+            Nothing ->
+              -- no repetition
+              [ startDate ]
+
+-- | on which days does a given reminder with a partial date occur?
+incarnationsPartial
+  :: [RemArg]
+  -- ^ the reminder
+  -> PartialDate
+  -- ^ the properly partial trigger date
+  -> Day
+  -- ^ the first day of the interval of interest
+  -> Day
+  -- ^ the last day of the interval of interest
+  -> [Day]
+  -- ^ the days within the interval on which the reminder occurs
+incarnationsPartial args pdate f t =
+  []
+
+
+-- | on which days does a given reminder using Repeat occur?
+incarnationsRepeat
   :: [RemArg]
   -- ^ the reminder
   -> Day
-  -- ^ the DateSpecFull of the reminder
+  -- ^ the full DateSpec of the reminder
   -> Int
   -- ^ the Repeat of the reminder
   -> Day
@@ -58,7 +83,7 @@ repetitionDays
   -- ^ the last day of the interval of interest
   -> [Day]
   -- ^ the days within the interval on which the reminder occurs
-repetitionDays args firstDay repeat f t =
+incarnationsRepeat args firstDay repeat f t =
     map (flip addDays firstDay) $ map ((*) $ toInteger repeat) [rep_from..rep_to]
         where
            day2repetitionIdx :: Fractional a => Day -> a
