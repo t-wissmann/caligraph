@@ -102,8 +102,12 @@ day2widget st day_array day =
       duration r =
         case (CB.time r, CB.duration r) of
             (Just (h,m), Just (dh,dm)) ->
+                let
+                  m' = m + dm
+                  h' = h + dh + m' `div` 60
+                in
                 CB.showTime (h,m)
-                ++ "-" ++ CB.showTime (h+dh,m+dm) ++ " "
+                ++ "-" ++ CB.showTime (h' `mod` 24, m' `mod` 60) ++ " "
             (Just (h,m), Nothing) ->
                 CB.showTime (h,m) ++ " "
             (_, _) -> ""
