@@ -21,6 +21,7 @@ import Control.Monad.IO.Class (liftIO)
 import Text.Wrap
 import Data.Array
 import Data.Maybe
+import qualified Caligraph.Cli.UnicodeJunction as UJ
 
 import Data.Time.Calendar
 import Data.Time.Format (formatTime, defaultTimeLocale)
@@ -95,22 +96,26 @@ day2widget st day_array day =
         & vBox
       reminderWidget r =
         str " " <=>
-        strWrapWith (WrapSettings False True) (
-            duration r
-            ++ CB.title r
-        )
+        (duration r $
+        strWrapWith (WrapSettings False True) (CB.title r))
       duration r =
         case (CB.time r, CB.duration r) of
             (Just (h,m), Just (dh,dm)) ->
                 let
                   m' = m + dm
                   h' = h + dh + m' `div` 60
+                  c1 = UJ.get UJ.Empty  UJ.Empty UJ.Normal UJ.Empty
+                  c2 = UJ.get UJ.Normal UJ.Empty  UJ.Empty UJ.Empty
                 in
-                CB.showTime (h,m)
-                ++ "-" ++ CB.showTime (h' `mod` 24, m' `mod` 60) ++ " "
-            (Just (h,m), Nothing) ->
-                CB.showTime (h,m) ++ " "
-            (_, _) -> ""
+                (\txt ->
+                (str (CB.showTime c1 (h,m) ++ " ")
+                <=>
+                str (CB.showTime c2 (h' `mod` 24, m' `mod` 60))
+                ) <+> txt)
+            (Just (h,m), Nothing) -> (\txt ->
+                str (CB.showTime ':' (h,m) ++ " ")
+                <+>  txt)
+            (_, _) -> id
 
 ui st =
   [DayGrid.render (day2widget st reminders) $ st^.dayGrid]

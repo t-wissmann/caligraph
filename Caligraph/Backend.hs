@@ -17,9 +17,9 @@ data Incarnation = Incarnation
   -- , TODO: a timezone
   } deriving (Eq,Show)
 
-showTime :: (Int,Int) -> String
-showTime (h,m) =
-    printf "%2d:%02d" h m
+showTime :: Char -> (Int,Int) -> String
+showTime c (h,m) =
+    printf ("%2d" ++[c] ++"%02d" ) h m
 
 instance Ord Incarnation where
   compare i1 i2 =
