@@ -23,6 +23,7 @@ import Data.Array
 import Data.Maybe
 import qualified Caligraph.Cli.UnicodeJunction as UJ
 
+import qualified Data.Text as T
 import Data.Time.Calendar
 import Data.Time.Format (formatTime, defaultTimeLocale)
 import qualified Graphics.Vty as V
@@ -71,6 +72,65 @@ binds = Map.fromList
   ]
   where c f = (\st -> continue (st & dayGrid %~ f))
 
+reminder2widget :: Int -> CB.Incarnation -> Widget n
+reminder2widget idx r =
+    updateAttrMap (applyAttrMappings [("reminder", mainAttribute)])
+    $ withAttr "reminder"
+    $ Widget Greedy Fixed $ do
+        ctx <- getContext
+        return $ emptyResult & imageL .~ (reminderImage (ctx^.attrL) (ctx^.availWidthL))
+  where
+      reminderImage attr width =
+        let
+          durationWidth =
+            if length duration == 0
+            then 0
+            else (+) 1 $ maximum $ map V.safeWcswidth duration
+          titleWidth = (width - durationWidth)
+          lines =
+            (\l -> l ++ replicate (length duration - length l) "")
+            $ wrapTextToLines
+                (WrapSettings False True)
+                titleWidth
+                (T.pack $ CB.title r)
+          placeholder_string =
+            case duration of
+                (_:_:_) -> "  |  "
+                _       -> "     "
+          placeholder =
+            replicate (max 0 $ (length lines) - (length duration)) placeholder_string
+          safeTextWidth = V.safeWcswidth . T.unpack
+          durationImg =
+            V.vertCat
+            $ map (\s -> V.string attr (s ++ " "))
+            $ case duration of
+                (hd:tl) -> hd : (placeholder ++ tl)
+                [] -> []
+
+          lineImg lStr = V.string attr (lStr ++ replicate (titleWidth - V.safeWcswidth lStr) ' ')
+          lineImgs = lineImg <$> (map T.unpack lines)
+        in
+        V.horizJoin durationImg $ V.vertCat $ lineImgs
+
+      mainAttribute =
+        brightWhite `on` (if idx `mod` 2 == 0 then rgbColor 161 0 168 else rgbColor 99 0 103)
+      duration =
+        case (CB.time r, CB.duration r) of
+            (Just (h,m), Just (dh,dm)) ->
+                let
+                  m' = m + dm
+                  h' = h + dh + m' `div` 60
+                  -- c1 = UJ.get UJ.Empty  UJ.Strong UJ.Normal UJ.Strong
+                  -- c2 = UJ.get UJ.Normal UJ.Strong  UJ.Empty UJ.Strong
+                  c1 = ':'
+                  c2 = ':'
+                in
+                [ CB.showTime c1 (h,m)
+                , CB.showTime c2 (h' `mod` 24, m' `mod` 60)
+                ]
+            (Just (h,m), Nothing) ->
+                [CB.showTime ':' (h,m) ]
+            (_, _) -> []
 
 day2widget :: St -> Array Day [CB.Incarnation] -> Day -> Widget n
 day2widget st day_array day =
@@ -92,30 +152,8 @@ day2widget st day_array day =
         if y == y_now then "%d. %b" else "%d. %b %Y"
       reminders =
         (fromMaybe [] $ safeArray day_array day)
-        & map reminderWidget
+        & zipWith reminder2widget [0..]
         & vBox
-      reminderWidget r =
-        str " " <=>
-        (duration r $
-        strWrapWith (WrapSettings False True) (CB.title r))
-      duration r =
-        case (CB.time r, CB.duration r) of
-            (Just (h,m), Just (dh,dm)) ->
-                let
-                  m' = m + dm
-                  h' = h + dh + m' `div` 60
-                  c1 = UJ.get UJ.Empty  UJ.Empty UJ.Normal UJ.Empty
-                  c2 = UJ.get UJ.Normal UJ.Empty  UJ.Empty UJ.Empty
-                in
-                (\txt ->
-                (str (CB.showTime c1 (h,m) ++ " ")
-                <=>
-                str (CB.showTime c2 (h' `mod` 24, m' `mod` 60))
-                ) <+> txt)
-            (Just (h,m), Nothing) -> (\txt ->
-                str (CB.showTime ':' (h,m) ++ " ")
-                <+>  txt)
-            (_, _) -> id
 
 ui st =
   [DayGrid.render (day2widget st reminders) $ st^.dayGrid]
