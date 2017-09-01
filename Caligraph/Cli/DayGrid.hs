@@ -70,7 +70,7 @@ getScreenSize = do
 
 -- | render the calendar
 render :: (Ord n, Show n)
-  => (Day -> Widget n)
+  => (Day -> Int -> (Int,Widget n))
   -- ^ Rendering functor for a day
   -> St
   -- ^- Internal State
@@ -79,8 +79,9 @@ render :: (Ord n, Show n)
 render day2widget st =
   (st^.rows)
   & map (\(days,height,cb) ->
-        map (renderDay st day2widget) days
-        & flip (++) [renderRightmostBorder st $ last days]
+        map (renderDay st daywidth day2widget) days
+        & flip (++) [(1, renderRightmostBorder st $ last days)]
+        & map snd
         & map (setAvailableSize (daywidth,height))
         & map (cropBottomBy cb)
         & hBox
@@ -117,14 +118,16 @@ maybeOr (Just False) _ = Just False
 maybeOr _ (Just False) = Just False
 maybeOr _ _            = Nothing
 
-renderDay :: St -> (Day -> Widget n) -> Day -> Widget n
-renderDay st day2widget day =
-  ((topleftJunction <+> topBorderWidget)
+renderDay :: St -> Int -> (Day -> Int -> (Int,Widget n)) -> Day -> (Int, Widget n)
+renderDay st width day2widget day =
+  ( dayHeight + 1
+  , (topleftJunction <+> topBorderWidget)
     <=> (leftBorderWidget
          <+> ((if day == blackBgDay then withAttr "focusDay" else id) $
-                        day2widget day
+                        dayWidget
         <=> fill ' ')))
   where
+    (dayHeight,dayWidget) = day2widget day (width-1)
     boldDay = st^.focusDay
     blackBgDay = st^.today
     surrounding_days =
@@ -254,7 +257,7 @@ daysHeight :: St -> [Day] -> Int
 daysHeight s ds = foldr max 0 $ map (dayHeight s) ds
 
 dayHeight :: St -> Day -> Int
-dayHeight _ _ = 10
+dayHeight _ _ = 6
 
 -- | scroll the viewport by terminal rows
 scroll :: Int -> St -> St

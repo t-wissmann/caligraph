@@ -35,7 +35,7 @@ import qualified Data.Map.Strict as Map
 import qualified Caligraph.Backend as CB
 import qualified Caligraph.Remind.Backend as Remind
 import System.Environment (getArgs)
-import Data.List (sort)
+import Data.List (sort, intersperse)
 
 import Lens.Micro
 import Lens.Micro.TH
@@ -72,33 +72,37 @@ binds = Map.fromList
   ]
   where c f = (\st -> continue (st & dayGrid %~ f))
 
-reminder2widget :: Int -> CB.Incarnation -> Widget n
-reminder2widget idx r =
-    updateAttrMap (applyAttrMappings [("reminder", mainAttribute)])
-    $ withAttr "reminder"
-    $ Widget Greedy Fixed $ do
+reminder2widget :: Int -> CB.Incarnation -> Int -> (Int, Widget n)
+reminder2widget idx r width =
+    ( length lines
+    , updateAttrMap (applyAttrMappings [("reminder", mainAttribute)])
+      $ withAttr "reminder"
+      $ Widget Greedy Fixed $ do
         ctx <- getContext
-        return $ emptyResult & imageL .~ (reminderImage (ctx^.attrL) (ctx^.availWidthL))
+        return $ emptyResult & imageL .~ (reminderImage (ctx^.attrL))
+    )
   where
-      reminderImage attr width =
+      mainAttribute =
+        brightWhite `on` (if idx `mod` 2 == 0 then rgbColor 161 0 168 else rgbColor 99 0 103)
+      titleWidth = (width - durationWidth)
+      lines =
+        (\l -> l ++ replicate (length duration - length l) "")
+        $ wrapTextToLines
+            (WrapSettings False True)
+            titleWidth
+            (T.pack $ CB.title r)
+      durationWidth =
+        if length duration == 0
+        then 0
+        else (+) 1 $ maximum $ map V.safeWcswidth duration
+      placeholder_string =
+        case duration of
+            (_:_:_) -> "  |  "
+            _       -> "     "
+      placeholder =
+        replicate (max 0 $ (length lines) - (length duration)) placeholder_string
+      reminderImage attr =
         let
-          durationWidth =
-            if length duration == 0
-            then 0
-            else (+) 1 $ maximum $ map V.safeWcswidth duration
-          titleWidth = (width - durationWidth)
-          lines =
-            (\l -> l ++ replicate (length duration - length l) "")
-            $ wrapTextToLines
-                (WrapSettings False True)
-                titleWidth
-                (T.pack $ CB.title r)
-          placeholder_string =
-            case duration of
-                (_:_:_) -> "  |  "
-                _       -> "     "
-          placeholder =
-            replicate (max 0 $ (length lines) - (length duration)) placeholder_string
           safeTextWidth = V.safeWcswidth . T.unpack
           durationImg =
             V.vertCat
@@ -112,8 +116,6 @@ reminder2widget idx r =
         in
         V.horizJoin durationImg $ V.vertCat $ lineImgs
 
-      mainAttribute =
-        brightWhite `on` (if idx `mod` 2 == 0 then rgbColor 161 0 168 else rgbColor 99 0 103)
       duration =
         case (CB.time r, CB.duration r) of
             (Just (h,m), Just (dh,dm)) ->
@@ -132,12 +134,16 @@ reminder2widget idx r =
                 [CB.showTime ':' (h,m) ]
             (_, _) -> []
 
-day2widget :: St -> Array Day [CB.Incarnation] -> Day -> Widget n
-day2widget st day_array day =
-    (withAttr headerAttr $
-        hCenter $
-            str $ formatTime defaultTimeLocale day_format day)
-    <=> reminders
+-- | return a widget for a day and its total height
+day2widget :: St -> Array Day [CB.Incarnation] -> Day -> Int -> (Int,Widget n)
+day2widget st day_array day width =
+    (fromMaybe [] $ safeArray day_array day)
+    & zipWith (\i d -> reminder2widget i d width) [0..]
+    & intersperse (1, str " ") -- put empty lines in between
+    & (:) (1, str " ") -- put an empty line below header
+    & (:) headerWidget -- prepend header
+    & unzip
+    & (\(a,b) -> (sum a, vBox b))
     where
       today = st^.dayGrid^.DayGrid.today
       focus = st^.dayGrid^.DayGrid.focusDay
@@ -150,10 +156,13 @@ day2widget st day_array day =
       (y_now,_,_) = toGregorian today
       day_format =
         if y == y_now then "%d. %b" else "%d. %b %Y"
-      reminders =
-        (fromMaybe [] $ safeArray day_array day)
-        & zipWith reminder2widget [0..]
-        & vBox
+
+      headerWidget =
+        (,) 1
+        $ withAttr headerAttr
+            $ hCenter
+            $ str
+            $ formatTime defaultTimeLocale day_format day
 
 ui st =
   [DayGrid.render (day2widget st reminders) $ st^.dayGrid]
