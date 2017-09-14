@@ -43,6 +43,7 @@ import Lens.Micro.TH
 data St = St
     { _dayGrid :: DayGrid.St ()
     , _backend :: CB.Backend
+    , _visibleIncarnations :: Array Day [CB.Incarnation]
     }
 
 makeLenses ''St
@@ -135,9 +136,9 @@ reminder2widget idx r width =
             (_, _) -> []
 
 -- | return a widget for a day and its total height
-day2widget :: St -> Array Day [CB.Incarnation] -> DayGrid.DayWidget n
-day2widget st day_array day width =
-    (fromMaybe [] $ safeArray day_array day)
+day2widget :: St -> DayGrid.DayWidget n
+day2widget st day width =
+    (fromMaybe [] $ safeArray (st^.visibleIncarnations) day)
     & zipWith (\i d -> reminder2widget i d width) [0..]
     & intersperse (1, str " ") -- put empty lines in between
     & (:) (1, str " ") -- put an empty line below header
@@ -217,10 +218,13 @@ myHandleEvent s (MouseUp _ _ _) = continue s
 
 updateDayRange :: St -> St
 updateDayRange st =
-    st & dayGrid %~ (DayGrid.resizeDays $ day2widget st reminders)
+    st
+    & (if day_range == bounds (st^.visibleIncarnations)
+      then id
+      else visibleIncarnations .~ CB.query (st^.backend) day_range)
+    & (\s -> s & dayGrid %~ (DayGrid.resizeDays $ day2widget s))
     where
-    reminders =
-      CB.query (st^.backend) (DayGrid.rangeVisible $ st^.dayGrid)
+    day_range = (DayGrid.rangeVisible $ st^.dayGrid)
 
 testmain :: IO ()
 testmain = do
@@ -232,6 +236,10 @@ testmain = do
   today <- DayGrid.getToday
   args <- getArgs
   backend <- Remind.init (args !! 0)
-  customMain buildVty Nothing mainApp (St (DayGrid.init size today) backend)
+  customMain buildVty Nothing mainApp
+    (St
+        (DayGrid.init size today)
+        backend
+        (array (today,addDays (-1) today) []))
   return ()
 
