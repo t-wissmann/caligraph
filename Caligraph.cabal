@@ -21,6 +21,7 @@ library
     Caligraph.Remind.Parser
     Caligraph.Remind.Types
     Caligraph.Remind.Backend
+    Caligraph.LazyResult
     Caligraph.Cli.Main
     Caligraph.Cli.DayGrid
     Caligraph.Cli.UnicodeJunction
@@ -53,7 +54,9 @@ test-suite Caligraph-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  other-modules:       UnicodeJunctionSpec
+  other-modules:       Tester
+                     , UnicodeJunctionSpec
+                     , LazyResultSpec
   build-depends:       base
                      , Caligraph
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
