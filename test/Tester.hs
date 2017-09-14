@@ -1,6 +1,6 @@
 
 module Tester where
-type TestM = Either String ()
+type TestM a = Either String a
 
 infixr 5 =!=
 (=!=) :: (Show a,Eq a) => a -> a -> Either String ()
@@ -9,7 +9,7 @@ infixr 5 =!=
   then return ()
   else Left $ "Failed assertion " ++ show x ++ " =!= " ++ show y
 
-runTester :: TestM -> IO Int
+runTester :: TestM () -> IO Int
 runTester t =
   case t of
     Left str -> do

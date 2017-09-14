@@ -6,7 +6,7 @@ import Caligraph.Cli.UnicodeJunction
 
 import Data.List (nub)
 
-someLookups :: TestM
+someLookups :: TestM ()
 someLookups = do
   nub junction_types_avail =!= junction_types_avail
   get Empty  Empty Strong Strong =!= '┓'
