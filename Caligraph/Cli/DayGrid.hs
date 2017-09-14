@@ -27,19 +27,27 @@ import qualified System.Console.Terminal.Size as TerminalSize
 import Lens.Micro
 import Lens.Micro.TH
 
-data DayWidget n = DayWidget
-  { widget :: Day -> Widget n
-  , height :: Day -> Int
-  }
+-- | the type of a day widget
+type DayWidget n
+    = Day
+    -- ^ the day to render
+    -> Int
+    -- ^ the available width on the screen
+    -> (Int,Widget n)
+    -- ^ the widget and its height
+
+emptyDay :: DayWidget n
+emptyDay _ _ = (1, str "loading...")
 
 -- | The internal state
-data St = St
+data St n = St
   { _scrollOffset :: Int -- the number of rows hidden of _scrollDay
   , _scrollDay :: Day
   , _focusDay :: Day
   , _today :: Day
   , _size :: (Int,Int)
   , _rows :: [([Day],Int,Int)] -- the visible rows
+  , _day2widget :: DayWidget n
   -- , _columns ::Int -- the number of days per row
   }
 
@@ -50,9 +58,9 @@ init
   -- ^ the widget size
   -> Day
   -- ^ today
-  -> St
+  -> St n
 init size d =
-  computeVisibleRows $ St 0 d d d size []
+  computeVisibleRows $ St 0 d d d size [] emptyDay
 
 getToday :: IO Day
       -- ^ today
@@ -70,16 +78,14 @@ getScreenSize = do
 
 -- | render the calendar
 render :: (Ord n, Show n)
-  => (Day -> Int -> (Int,Widget n))
-  -- ^ Rendering functor for a day
-  -> St
+  => St n
   -- ^- Internal State
   -> Widget n
   -- ^ Rendered widget
-render day2widget st =
+render st =
   (st^.rows)
   & map (\(days,height,cb) ->
-        map (renderDay st daywidth day2widget) days
+        map (renderDay st daywidth) days
         & flip (++) [(1, renderRightmostBorder st $ last days)]
         & map snd
         & map (setAvailableSize (daywidth,height))
@@ -100,7 +106,7 @@ data Surrounding celltype = Surrounding
   , wNeighbour :: Maybe celltype -- west neighbour
   } deriving (Functor)
 
-surroundingDays :: St -> Day -> Surrounding Day
+surroundingDays :: St n -> Day -> Surrounding Day
 surroundingDays _ day =
   fmap (flip addDays day) $
   case dayOfWeek of
@@ -118,8 +124,8 @@ maybeOr (Just False) _ = Just False
 maybeOr _ (Just False) = Just False
 maybeOr _ _            = Nothing
 
-renderDay :: St -> Int -> (Day -> Int -> (Int,Widget n)) -> Day -> (Int, Widget n)
-renderDay st width day2widget day =
+renderDay :: St n -> Int -> Day -> (Int, Widget n)
+renderDay st width day =
   ( dayHeight + 1
   , (topleftJunction <+> topBorderWidget)
     <=> (leftBorderWidget
@@ -127,7 +133,7 @@ renderDay st width day2widget day =
                         dayWidget
         <=> fill ' ')))
   where
-    (dayHeight,dayWidget) = day2widget day (width-1)
+    (dayHeight,dayWidget) = (st^.day2widget) day (width-1)
     boldDay = st^.focusDay
     blackBgDay = st^.today
     surrounding_days =
@@ -137,7 +143,7 @@ renderDay st width day2widget day =
       renderBorder st thisDayBold surrounding_days
 
 renderBorder
-  :: St
+  :: St n
   -> Maybe Bool
   -- ^- wether this day is bold, or Nothing if 'this day' does not exist
   -> Surrounding Bool
@@ -170,7 +176,7 @@ renderBorder st thisDayBold (Surrounding northwest north _ west) =
       & forceAttr "cellBorder"
 
 renderRightmostBorder
-  :: St
+  :: St n
   -- ^ the current state
   -> Day
   -- ^ the last day in the row
@@ -185,7 +191,7 @@ renderRightmostBorder st day =
     shifted_surroundings = Surrounding n' ne' Nothing thisDayBold
     (lb,j,_) = renderBorder st Nothing shifted_surroundings
 
-scrollToFocus :: St -> St
+scrollToFocus :: St n -> St n
 scrollToFocus st =
   case L.find (\(_,(ds,_,_)) -> st^.focusDay `elem` ds) (zip [0..] $ st^.rows) of
     -- if the focus day is among the rows, but in the first row
@@ -219,7 +225,7 @@ scrollToFocus st =
               & scrollOffset .~ 0
               & computeVisibleRows
 
-computeVisibleRows :: St -> St
+computeVisibleRows :: St n -> St n
 computeVisibleRows st =
   if (st^.scrollOffset < 0)
   then st & scrollDay %~ (addDays (-7))
@@ -253,27 +259,30 @@ weekOf day =
   & map (flip addDays day)
   where (_,_,dayOfWeek) = toWeekDate day
 
-daysHeight :: St -> [Day] -> Int
+daysHeight :: St n -> [Day] -> Int
 daysHeight s ds = foldr max 0 $ map (dayHeight s) ds
 
-dayHeight :: St -> Day -> Int
-dayHeight _ _ = 6
+dayHeight :: St n -> Day -> Int
+dayHeight st d = max 6 (1 + (fst $ (st^.day2widget) d (dayWidth st)))
+
+dayWidth :: St n -> Int
+dayWidth st = fst (st^.size) `div` 7
 
 -- | scroll the viewport by terminal rows
-scroll :: Int -> St -> St
+scroll :: Int -> St n -> St n
 scroll delta s = s
       & scrollOffset %~ ((+) delta)
       & computeVisibleRows
 
 -- | scroll the viewport by the given number of pages
-scrollPage :: Double -> St -> St
+scrollPage :: Double -> St n -> St n
 scrollPage pages st =
     st
     & scroll (floor $ pages * (fromIntegral $ snd $ st^.size))
     & moveFocusIntoView
 
 
-resize :: (Int,Int) -> St -> St
+resize :: (Int,Int) -> St n -> St n
 resize (w,h) s = s
     & size .~ (w,h)
     & computeVisibleRows
@@ -281,7 +290,7 @@ resize (w,h) s = s
 
 
 data Dir = DirUp | DirDown | DirLeft  | DirRight
-dayInDirecton :: St -> Dir -> Day
+dayInDirecton :: St n -> Dir -> Day
 dayInDirecton st dir =
     flip addDays (st^.focusDay) $
     case dir of
@@ -290,14 +299,14 @@ dayInDirecton st dir =
         DirLeft -> (-1)
         DirRight -> 1
 
-moveFocus :: Dir -> St -> St
+moveFocus :: Dir -> St n -> St n
 moveFocus d st =
     st & focusDay .~ dayInDirecton st d
        & scrollToFocus
 
 
 -- | update the focused cell s.t. it is in the view
-moveFocusIntoView :: St -> St
+moveFocusIntoView :: St n -> St n
 moveFocusIntoView st =
   st & focusDay .~ fromMaybe (st^.focusDay) (do
     (first_row,_,_) <- listToMaybe (st^.rows)
@@ -311,15 +320,21 @@ moveFocusIntoView st =
         return (addDays (toInteger dayOfWeek - 7) last_day)
       else Nothing) -- nothing needs to be changed
 
-gotoToday :: St -> St
+gotoToday :: St n -> St n
 gotoToday st =
     st & focusDay .~ (st^.today) & scrollToFocus
 
-rangeVisible :: St -> (Day,Day)
+rangeVisible :: St n -> (Day,Day)
 rangeVisible st = fromMaybe (st^.scrollDay,st^.scrollDay) $ do
     (first_row,_,_) <- listToMaybe (st^.rows)
     (last_row,_,_) <- lastSafe (st^.rows)
     first_day <- listToMaybe first_row
     last_day <- lastSafe last_row
     return (first_day, last_day)
+
+resizeDays :: DayWidget n -> St n -> St n
+resizeDays d st =
+    st
+    & day2widget .~ d
+    & computeVisibleRows
 

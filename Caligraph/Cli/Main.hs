@@ -41,7 +41,7 @@ import Lens.Micro
 import Lens.Micro.TH
 
 data St = St
-    { _dayGrid :: DayGrid.St
+    { _dayGrid :: DayGrid.St ()
     , _backend :: CB.Backend
     }
 
@@ -135,7 +135,7 @@ reminder2widget idx r width =
             (_, _) -> []
 
 -- | return a widget for a day and its total height
-day2widget :: St -> Array Day [CB.Incarnation] -> Day -> Int -> (Int,Widget n)
+day2widget :: St -> Array Day [CB.Incarnation] -> DayGrid.DayWidget n
 day2widget st day_array day width =
     (fromMaybe [] $ safeArray day_array day)
     & zipWith (\i d -> reminder2widget i d width) [0..]
@@ -165,10 +165,7 @@ day2widget st day_array day width =
             $ formatTime defaultTimeLocale day_format day
 
 ui st =
-  [DayGrid.render (day2widget st reminders) $ st^.dayGrid]
-  where
-    reminders =
-      CB.query (st^.backend) (DayGrid.rangeVisible $ st^.dayGrid)
+  [DayGrid.render $ st^.dayGrid]
 
 
 
@@ -187,7 +184,7 @@ mainApp =
   App { appDraw = ui
       , appChooseCursor = const $ const Nothing
       , appHandleEvent = myHandleEvent
-      , appStartEvent = (\s -> tryEnableMouse >> return s)
+      , appStartEvent = (\s -> tryEnableMouse >> return (updateDayRange s))
       , appAttrMap = const $ attrMap defAttr
         [ ("cellBorder", fg white)
         , ("cellHeader", yellow `on` black)
@@ -204,21 +201,26 @@ myHandleEvent s (VtyEvent e) =
       halt s
     EvKey key mods ->
       case Map.lookup (mods,key) binds of
-        Just cb -> cb s
-        Nothing -> continue s
+        Just cb -> fmap (fmap updateDayRange) (cb s)
+        Nothing -> continue (updateDayRange s)
     EvResize w h ->
-      continue (s & dayGrid %~ DayGrid.resize (w,h))
+      continue (s & dayGrid %~ DayGrid.resize (w,h) & updateDayRange)
     EvMouseDown _ _ BScrollDown _ ->
-      continue (s & dayGrid %~ DayGrid.scroll 3)
+      continue (s & dayGrid %~ DayGrid.scroll 3 & updateDayRange)
     EvMouseDown _ _ BScrollUp _ ->
-      continue (s & dayGrid %~ DayGrid.scroll (-3))
+      continue (s & dayGrid %~ DayGrid.scroll (-3) & updateDayRange)
     _ ->
       continue s
-
 myHandleEvent s (AppEvent ()) = continue s
 myHandleEvent s (MouseDown _ _ _ _) = continue s
 myHandleEvent s (MouseUp _ _ _) = continue s
 
+updateDayRange :: St -> St
+updateDayRange st =
+    st & dayGrid %~ (DayGrid.resizeDays $ day2widget st reminders)
+    where
+    reminders =
+      CB.query (st^.backend) (DayGrid.rangeVisible $ st^.dayGrid)
 
 testmain :: IO ()
 testmain = do
