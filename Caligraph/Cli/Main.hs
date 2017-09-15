@@ -136,7 +136,7 @@ reminder2widget idx r width =
             (_, _) -> []
 
 -- | return a widget for a day and its total height
-day2widget :: St -> DayGrid.DayWidget n
+day2widget :: St -> Day -> DayGrid.DayWidget n
 day2widget st day width =
     (fromMaybe [] $ safeArray (st^.visibleIncarnations) day)
     & zipWith (\i d -> reminder2widget i d width) [0..]

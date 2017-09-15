@@ -8,6 +8,7 @@ import qualified Caligraph.Cli.UnicodeJunction as UnicodeJunction
 
 import Caligraph.Utils
 import Data.Maybe
+import Caligraph.LazyResult
 
 import Brick
 import Brick.Widgets.Border
@@ -21,6 +22,8 @@ import Data.Time.Clock (getCurrentTime, utctDay)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 
 import qualified Data.List as L
+import qualified Data.Map.Strict as M
+import Data.Map.Strict (Map)
 
 import qualified System.Console.Terminal.Size as TerminalSize
 
@@ -29,15 +32,13 @@ import Lens.Micro.TH
 
 -- | the type of a day widget
 type DayWidget n
-    = Day
-    -- ^ the day to render
-    -> Int
+    = Int
     -- ^ the available width on the screen
     -> (Int,Widget n)
     -- ^ the widget and its height
 
 emptyDay :: DayWidget n
-emptyDay _ _ = (1, str "loading...")
+emptyDay _ = (1, str "loading...")
 
 -- | The internal state
 data St n = St
@@ -47,11 +48,15 @@ data St n = St
   , _today :: Day
   , _size :: (Int,Int)
   , _rows :: [([Day],Int,Int)] -- the visible rows
-  , _day2widget :: DayWidget n
+  , _day2widget :: Day -> (DayWidget n)
+  , _dayCache :: Map Day (DayWidget n)
   -- , _columns ::Int -- the number of days per row
   }
 
 makeLenses ''St
+
+type StDays n = LazyResult Day (DayWidget n) (St n)
+
 
 init
   :: (Int,Int)
@@ -60,7 +65,7 @@ init
   -- ^ today
   -> St n
 init size d =
-  computeVisibleRows $ St 0 d d d size [] emptyDay
+  computeVisibleRows $ St 0 d d d size [] (const emptyDay) M.empty
 
 getToday :: IO Day
       -- ^ today
@@ -332,7 +337,7 @@ rangeVisible st = fromMaybe (st^.scrollDay,st^.scrollDay) $ do
     last_day <- lastSafe last_row
     return (first_day, last_day)
 
-resizeDays :: DayWidget n -> St n -> St n
+resizeDays :: (Day -> DayWidget n) -> St n -> St n
 resizeDays d st =
     st
     & day2widget .~ d
