@@ -25,6 +25,8 @@ library
     Caligraph.Cli.Main
     Caligraph.Cli.DayGrid
     Caligraph.Cli.UnicodeJunction
+    Caligraph.Config.Main
+    Caligraph.Config.Calendars
   build-depends:
       base
     , parsec
@@ -40,6 +42,11 @@ library
     , contravariant
     , word-wrap
     , text
+    , ini
+    , directory
+    , filepath
+    , xdg-basedir
+    , unordered-containers
   default-language:    Haskell2010
 
 executable caligraph

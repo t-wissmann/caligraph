@@ -15,6 +15,7 @@ import qualified Caligraph.Cli.DayGrid as DayGrid
 import Caligraph.Cli.DayGrid (Dir(DirUp,DirDown,DirLeft,DirRight))
 
 import Caligraph.Utils
+import qualified Caligraph.Config.Calendars as Config
 
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
@@ -34,8 +35,11 @@ import Graphics.Vty.Output.Interface (supportsMode,Mode(Mouse),setMode)
 import qualified Data.Map.Strict as Map
 import qualified Caligraph.Backend as CB
 import qualified Caligraph.Remind.Backend as Remind
+import System.Exit
 import System.Environment (getArgs)
-import Data.List (sort, intersperse)
+import System.Directory (getHomeDirectory)
+import System.FilePath (joinPath)
+import Data.List (sort, intersperse, isPrefixOf)
 
 import Lens.Micro
 import Lens.Micro.TH
@@ -235,11 +239,25 @@ testmain = do
   size <- DayGrid.getScreenSize
   today <- DayGrid.getToday
   args <- getArgs
-  backend <- Remind.init (args !! 0)
+  calendars <- Config.load >>= rightOrDie
+  p <- (expandTilde $ Config.path $ snd $ calendars !! 0)
+  backend <- Remind.init p
   customMain buildVty Nothing mainApp
     (St
         (DayGrid.init size today)
         backend
         (array (today,addDays (-1) today) []))
   return ()
+
+rightOrDie :: Either String a -> IO a
+rightOrDie = either die return
+
+expandTilde :: FilePath -> IO FilePath
+expandTilde s =
+    case s of
+     ['~'] -> getHomeDirectory
+     ('~':'/':tl) -> do
+        home <- getHomeDirectory
+        return $ joinPath [home, tl]
+     x -> return x
 
