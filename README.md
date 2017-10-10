@@ -1,6 +1,6 @@
 # Caligraph
 
-A frontend to [remind](https://www.roaringpenguin.com/products/remind) calendar program.
+A frontend to the [remind](https://www.roaringpenguin.com/products/remind) calendar program.
 
 ## Compilation
 You need Haskell's `stack` tool to be installed. In order to build, type:
@@ -10,6 +10,11 @@ $ stack build
 In order to run, type:
 ```
 $ stack exec caligraph
+```
+
+## Install
+```
+$ stack install
 ```
 
 ## Workaround on Arch Linux, October 2017
