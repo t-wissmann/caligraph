@@ -36,7 +36,6 @@ library
     , containers
     , microlens
     , microlens-th
-    , terminal-size
     , array
     , mtl
     , contravariant

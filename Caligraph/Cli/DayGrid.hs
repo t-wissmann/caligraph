@@ -25,8 +25,6 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import Data.Map.Strict (Map)
 
-import qualified System.Console.Terminal.Size as TerminalSize
-
 import Lens.Micro
 import Lens.Micro.TH
 
@@ -72,14 +70,6 @@ getToday :: IO Day
 getToday = do
   g <- getCurrentTime
   return $ utctDay g
-
-getScreenSize :: IO (Int,Int)
-           -- ^ the width and height of the screen
-getScreenSize = do
-  termSize <- TerminalSize.size
-  return $ case termSize of
-    Nothing -> (40,80)
-    Just (TerminalSize.Window h w) -> (w,h)
 
 -- | render the calendar
 render :: (Ord n, Show n)

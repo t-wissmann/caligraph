@@ -236,7 +236,7 @@ testmain = do
         v <- V.mkVty =<< V.standardIOConfig
         V.setMode (V.outputIface v) V.Mouse True
         return v
-  size <- DayGrid.getScreenSize
+  size <- return (60,80) -- FIXME: putting 40, 80 here triggers an endless loop..
   today <- DayGrid.getToday
   args <- getArgs
   calendars <- Config.load >>= rightOrDie
