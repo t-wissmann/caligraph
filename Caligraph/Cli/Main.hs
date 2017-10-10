@@ -89,7 +89,7 @@ reminder2widget idx r width =
   where
       mainAttribute =
         brightWhite `on` (if idx `mod` 2 == 0 then rgbColor 161 0 168 else rgbColor 99 0 103)
-      titleWidth = (width - durationWidth)
+      titleWidth = max 1 (width - durationWidth)
       lines =
         (\l -> l ++ replicate (length duration - length l) "")
         $ wrapTextToLines
@@ -236,7 +236,7 @@ testmain = do
         v <- V.mkVty =<< V.standardIOConfig
         V.setMode (V.outputIface v) V.Mouse True
         return v
-  size <- return (60,80) -- FIXME: putting 40, 80 here triggers an endless loop..
+  size <- return (40,80)
   today <- DayGrid.getToday
   args <- getArgs
   calendars <- Config.load >>= rightOrDie
