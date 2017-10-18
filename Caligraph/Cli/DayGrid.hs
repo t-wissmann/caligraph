@@ -12,6 +12,7 @@ import Caligraph.LazyResult
 
 import Brick
 import Brick.Widgets.Border
+import qualified Brick.Types
 import Brick.Main
 import Brick.Widgets.Core (withAttr, cropTopBy, cropBottomBy,setAvailableSize)
 import Brick.AttrMap (attrMap, AttrMap)
@@ -25,8 +26,10 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import Data.Map.Strict (Map)
 
+import Control.Monad.Reader
 import Lens.Micro
 import Lens.Micro.TH
+import Lens.Micro.Extras (view)
 
 -- | the type of a day widget
 type DayWidget n
@@ -78,21 +81,26 @@ render :: (Ord n, Show n)
   -> Widget n
   -- ^ Rendered widget
 render st =
-  (st^.rows)
-  & map (\(days,height,cb) ->
-        map (renderDay st daywidth) days
-        & flip (++) [(1, renderRightmostBorder st $ last days)]
-        & map snd
-        & map (setAvailableSize (daywidth,height))
-        & map (cropBottomBy cb)
-        & hBox
+  Widget Greedy Greedy render'
+  where
+    mapHead _ [] = []
+    mapHead f (x:xs) = (f x:xs)
+    render' = do
+      fullwidth <- asks (view availWidthL)
+      height <- asks (view availHeightL)
+      daywidth <- return ((fullwidth - 1) `div` 7)
+      Brick.Types.render $
+        (st^.rows)
+        & map (\(days,height,cb) ->
+          map (renderDay st daywidth) days
+          & flip (++) [(1, renderRightmostBorder st $ last days)]
+          & map snd
+          & map (setAvailableSize (daywidth,height))
+          & map (cropBottomBy cb)
+          & hBox
         )
-  & mapHead (cropTopBy (st^.scrollOffset))
-  & vBox
-  where (fullwidth,_) = st^.size
-        daywidth = (fullwidth - 1) `div` 7
-        mapHead _ [] = []
-        mapHead f (x:xs) = (f x:xs)
+        & mapHead (cropTopBy (st^.scrollOffset))
+        & vBox
 
 data Surrounding celltype = Surrounding
   { nwNeighour :: Maybe celltype -- north west neighbour
