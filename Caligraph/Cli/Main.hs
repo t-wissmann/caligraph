@@ -139,17 +139,55 @@ reminder2widget idx r width =
                 [CB.showTime ':' (h,m) ]
             (_, _) -> []
 
+reminder2widgetInline :: Int -> CB.Incarnation -> Int -> (Int, Widget n)
+reminder2widgetInline idx r width =
+    ( length lines
+    , updateAttrMap (applyAttrMappings [("reminder", mainAttribute)])
+      $ withAttr "reminder"
+      $ txt $ T.intercalate "\n" lines
+    )
+  where
+      mainAttribute =
+        brightWhite `on` (if idx `mod` 2 == 0 then rgbColor 161 0 168 else rgbColor 99 0 103)
+      durationString =
+        case (CB.time r, CB.duration r) of
+            (Just (h,m), Just (dh,dm)) ->
+                let
+                  m' = m + dm
+                  h' = h + dh + m' `div` 60
+                  -- c1 = UJ.get UJ.Empty  UJ.Strong UJ.Normal UJ.Strong
+                  -- c2 = UJ.get UJ.Normal UJ.Strong  UJ.Empty UJ.Strong
+                  c1 = ':'
+                  c2 = ':'
+                in
+                CB.showTime c1 (h,m) ++ "-" ++
+                CB.showTime c2 (h' `mod` 24, m' `mod` 60)
+                ++ " "
+            (Just (h,m), Nothing) ->
+                CB.showTime ':' (h,m) ++ " "
+            (_, _) -> ""
+      lines =
+        map (T.justifyLeft width ' ')
+        $ wrapTextToLines (WrapSettings True True) width
+        $ T.pack
+        $ contentString
+      contentString = durationString ++ CB.title r
+
 -- | return a widget for a day and its total height
 day2widget :: St -> Day -> DayGrid.DayWidget n
 day2widget st day width =
     (fromMaybe [] $ safeArray (st^.visibleIncarnations) day)
-    & zipWith (\i d -> reminder2widget i d width) [0..]
+    & zipWith (\i d -> widget i d width) [0..]
     & intersperse (1, str " ") -- put empty lines in between
     & (:) (1, str " ") -- put an empty line below header
     & (:) headerWidget -- prepend header
     & unzip
     & (\(a,b) -> (sum a, vBox b))
     where
+      widget =
+        if width < 20
+        then reminder2widgetInline
+        else reminder2widget
       today = st^.dayGrid^.DayGrid.today
       focus = st^.dayGrid^.DayGrid.focusDay
       headerAttr
