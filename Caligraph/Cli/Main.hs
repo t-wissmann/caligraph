@@ -236,7 +236,6 @@ testmain = do
         v <- V.mkVty =<< V.standardIOConfig
         V.setMode (V.outputIface v) V.Mouse True
         return v
-  size <- return (40,80)
   today <- DayGrid.getToday
   args <- getArgs
   calendars <- Config.load >>= rightOrDie
@@ -244,7 +243,7 @@ testmain = do
   backend <- Remind.init p
   customMain buildVty Nothing mainApp
     (St
-        (DayGrid.init size today)
+        (DayGrid.init today)
         backend
         (array (today,addDays (-1) today) []))
   return ()

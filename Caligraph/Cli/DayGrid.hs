@@ -90,7 +90,7 @@ data St n = St
   , _scrollDay :: Day
   , _focusDay :: Day
   , _today :: Day
-  , _size :: (Int,Int)
+  , _size :: Maybe (Int,Int)
   , _day2widget :: Day -> (DayWidget n)
   , _dayCache :: Map Day (DayWidget n)
   , _rowController :: RowController
@@ -103,13 +103,11 @@ type StDays n = LazyResult Day (DayWidget n) (St n)
 
 
 init
-  :: (Int,Int)
-  -- ^ the widget size
-  -> Day
+  :: Day
   -- ^ today
   -> St n
-init size d =
-  St 0 d d d size (const emptyDay) M.empty weekPerRow
+init d =
+  St 0 d d d Nothing (const emptyDay) M.empty weekPerRow
 
 getToday :: IO Day
       -- ^ today
@@ -333,7 +331,8 @@ scrollPage pages st =
 
 resize :: (Int,Int) -> St n -> St n
 resize (w,h) s = s
-    -- & size .~ (w,h)
+    & size .~ Just (w,h)
+    & normalizeScrollDay
     -- & computeVisibleRows
     -- & scrollToFocus
 
