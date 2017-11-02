@@ -44,8 +44,12 @@ import Data.List (sort, intersperse, isPrefixOf)
 import Lens.Micro
 import Lens.Micro.TH
 
+data WidgetName =
+    WNDayGrid
+    deriving (Ord,Eq,Show)
+
 data St = St
-    { _dayGrid :: DayGrid.St ()
+    { _dayGrid :: DayGrid.St WidgetName
     , _backend :: CB.Backend
     , _visibleIncarnations :: Array Day [CB.Incarnation]
     }
@@ -53,7 +57,7 @@ data St = St
 makeLenses ''St
 
 
-binds :: Map.Map ([Modifier],Key) (St -> EventM () (Next St))
+binds :: Map.Map ([Modifier],Key) (St -> EventM WidgetName (Next St))
 binds = Map.fromList
   [ (([], KEsc), halt)
   , (([], KChar 'q'), halt)
@@ -212,7 +216,7 @@ ui st =
 
 
 
-tryEnableMouse :: EventM n ()
+tryEnableMouse :: EventM WidgetName ()
 tryEnableMouse = do
   vty <- Brick.Main.getVtyHandle
   let output = outputIface vty
@@ -222,11 +226,16 @@ tryEnableMouse = do
   return ()
 
 
-mainApp :: App St () ()
+mainApp :: App St () WidgetName
 mainApp =
   App { appDraw = ui
       , appChooseCursor = const $ const Nothing
-      , appHandleEvent = myHandleEvent
+      , appHandleEvent = (\s ev ->
+            do
+            dg <- DayGrid.updateWidgetSize (s^.dayGrid)
+            s' <- return (s & (dayGrid .~ dg))
+            myHandleEvent s' ev
+        )
       , appStartEvent = (\s -> tryEnableMouse >> return (updateDayRange s))
       , appAttrMap = const $ attrMap defAttr
         [ ("cellBorder", fg white)
@@ -237,7 +246,7 @@ mainApp =
         ]
       }
 
-myHandleEvent :: St -> BrickEvent () () -> EventM () (Next St)
+myHandleEvent :: St -> BrickEvent WidgetName () -> EventM WidgetName (Next St)
 myHandleEvent s (VtyEvent e) =
   case e of
     EvKey KEsc mods ->
@@ -281,7 +290,7 @@ testmain = do
   backend <- Remind.init p
   customMain buildVty Nothing mainApp
     (St
-        (DayGrid.init today)
+        (DayGrid.init WNDayGrid today)
         backend
         (array (today,addDays (-1) today) []))
   return ()

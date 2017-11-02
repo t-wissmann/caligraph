@@ -86,7 +86,8 @@ weekPerRow = RowController
 
 -- | The internal state
 data St n = St
-  { _scrollOffset :: Int -- the number of rows hidden of _scrollDay
+  { _widgetName :: n
+  , _scrollOffset :: Int -- the number of rows hidden of _scrollDay
   , _scrollDay :: Day
   , _focusDay :: Day
   , _today :: Day
@@ -103,11 +104,13 @@ type StDays n = LazyResult Day (DayWidget n) (St n)
 
 
 init
-  :: Day
+  :: n
+  -- ^ the widgets name
+  -> Day
   -- ^ today
   -> St n
-init d =
-  St 0 d d d Nothing (const emptyDay) M.empty weekPerRow
+init n d =
+  St n 0 d d d Nothing (const emptyDay) M.empty weekPerRow
 
 getToday :: IO Day
       -- ^ today
@@ -122,6 +125,7 @@ render :: (Ord n, Show n)
   -> Widget n
   -- ^ Rendered widget
 render st =
+  reportExtent (st^.widgetName) $
   Widget Greedy Greedy render'
   where
     mapHead _ [] = []
@@ -143,12 +147,28 @@ render st =
         & mapHead (cropTopBy (st^.scrollOffset))
         & vBox
 
-computeVisibleRows :: St n -> (Int,Int) -> [([Day],Int,Int)]
+-- | call this after this widget has been rendered
+updateWidgetSize :: Eq n => St n -> EventM n (St n)
+updateWidgetSize st = do
+  mExtent <- lookupExtent (st^.widgetName)
+  case mExtent of
+    Nothing -> return st
+    Just (Extent _ _ lastsize _) ->
+      st
+      & size .~ Just lastsize
+      & return
+
+computeVisibleRows
+    :: St n
+    -> (Int,Int)
+    -- ^ the screen size
+    -> [([Day],Int,Int)]
+    -- ^ the list of visible rows, containing their height and the number
+    --   of terminal rows cropped off at the bottom
 computeVisibleRows st (fullwidth,fullheight) =
-  remainingRows firstrow fullheight
+  remainingRows firstrow (fullheight+ (st^.scrollOffset))
   where
-    rc :: RowController
-    rc = st^.rowController
+    rc = (st^.rowController)
     firstrow = (rc^.rowOf) (st^.scrollDay)
     remainingRows :: [Day] -> Int -> [([Day],Int,Int)]
     remainingRows row rem_height =
@@ -269,45 +289,19 @@ scrollToFocus st = st
   --            & scrollOffset .~ 0
   --            & computeVisibleRows
 
--- computeVisibleRows :: St n -> St n
--- computeVisibleRows st =
-  --if (st^.scrollOffset < 0)
-  --then st & scrollDay %~ (addDays (-7))
-  --        & (\s -> s & scrollOffset %~ (\x -> x + weekHeight s))
-  --        & computeVisibleRows
-  --else
-  --  if (st^.scrollOffset >= weekHeight st)
-  --  then st & scrollDay %~ (addDays (7))
-  --          & (\s -> s & scrollOffset %~ (\x -> x - weekHeight st))
-  --          & computeVisibleRows
-  --  else
-  --  st & rows .~ new_rows_around (st^.scrollDay) (st^.scrollOffset)
-  --where
-  --  weekHeight s = daysHeight s (weekOf $ s^.scrollDay)
-  --  addWeeksLater :: Int -> [Day] -> [([Day],Int,Int)]
-  --  addWeeksLater space_remain week =
-  --    if space_remain <= curheight
-  --    then [(week, curheight, curheight - space_remain)]
-  --    else
-  --      (week, curheight, 0) : (addWeeksLater (space_remain - curheight) $ map (addDays 7) week)
-  --    where curheight = daysHeight st week
-
-  --  new_rows_around day offset =
-  --    weekOf day
-  --    & addWeeksLater ((snd $ st^.size) + offset)
-
-
 weekOf :: Day -> [Day]
 weekOf day =
   [1 - toInteger dayOfWeek .. 7 - toInteger dayOfWeek]
   & map (flip addDays day)
   where (_,_,dayOfWeek) = toWeekDate day
 
+minimumDayHeight = 4
+
 daysHeight :: St n -> Int -> [Day] -> Int
-daysHeight s width ds = foldr max 1 $ map (dayHeight s width) ds
+daysHeight s width ds = foldr max minimumDayHeight $ map (dayHeight s width) ds
 
 dayHeight :: St n -> Int -> Day -> Int
-dayHeight st width d = max 4 (1 + (fst $ (st^.day2widget) d ((st^.rowController.dayWidth) d width)))
+dayHeight st width d = max minimumDayHeight (1 + (fst $ (st^.day2widget) d ((st^.rowController.dayWidth) d width)))
 
 -- | scroll the viewport by terminal rows
 scroll :: Int -> St n -> St n
@@ -317,15 +311,36 @@ scroll delta s = s
       -- & computeVisibleRows
 
 normalizeScrollDay :: St n -> St n
-normalizeScrollDay st = st
-    --where
-    --    rows = computeVisibleRows st
+normalizeScrollDay st =
+  case (st^.size) of
+    Nothing -> st
+    Just (width,height) ->
+      let firstRowHeight = daysHeight st width firstRow in
+      let prevRow = (rc^.previousRow) firstRow in
+      if (st^.scrollOffset < 0) then
+        st
+        & scrollDay .~ head prevRow
+        & scrollOffset %~ (+) (daysHeight st width prevRow)
+        & normalizeScrollDay
+      else if (st^.scrollOffset >= firstRowHeight) then
+        st
+        & scrollOffset %~ flip (-) firstRowHeight
+        & scrollDay .~ (head $ (rc^.nextRow) firstRow)
+        & normalizeScrollDay
+      else st
+    where
+        rc = (st^.rowController)
+        firstRow = (rc^.rowOf) (st^.scrollDay)
+
 
 -- | scroll the viewport by the given number of pages
 scrollPage :: Double -> St n -> St n
 scrollPage pages st =
-    st
-    -- & scroll (floor $ pages * (fromIntegral $ snd $ st^.size))
+  case (st^.size) of
+    Nothing -> st
+    Just (_,height) ->
+      st
+      & scroll (floor $ pages * (fromIntegral height))
     -- & moveFocusIntoView
 
 
@@ -374,8 +389,17 @@ gotoToday st =
 
 rangeVisible :: St n -> (Day,Day)
 rangeVisible st =
+    let
+      height =
+        case (st^.size) of
+          Nothing -> 1000
+          Just (_,h) -> h
+      daysVisible = fromIntegral $
+        (st^.rowController.columns)
+          * (height `div` minimumDayHeight)
+    in
     ( addDays (-80) (st^.scrollDay)
-    , addDays 80 (st^.scrollDay)
+    , addDays (80+daysVisible) (st^.scrollDay)
     )
     -- $ do
     -- (first_row,_,_) <- listToMaybe (st^.rows)
@@ -390,3 +414,4 @@ resizeDays d st =
     & day2widget .~ d
     -- & computeVisibleRows
 
+-- vim: sw=2 ts=2
