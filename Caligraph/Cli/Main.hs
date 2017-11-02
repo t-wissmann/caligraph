@@ -168,10 +168,10 @@ reminder2widgetInline idx r width =
             (_, _) -> ""
       lines =
         map (T.justifyLeft width ' ')
-        $ wrapTextToLines (WrapSettings True True) width
+        $ wrapTextToLines (WrapSettings False True) width
         $ T.pack
         $ contentString
-      contentString = durationString ++ CB.title r
+      contentString = (dropWhile (==' ') durationString) ++ CB.title r
 
 -- | return a widget for a day and its total height
 day2widget :: St -> Day -> DayGrid.DayWidget n
