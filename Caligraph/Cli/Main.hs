@@ -201,8 +201,11 @@ day2widget st day width =
         | otherwise     = "cellHeader"
       (y,_,_) = toGregorian day
       (y_now,_,_) = toGregorian today
-      day_format =
-        if y == y_now then "%d. %b" else "%d. %b %Y"
+      day_format
+        | y == y_now    = "%d. %b"
+        | width >= 12   = "%d. %b %Y"
+        | width >= 10   = "%d. %b %y"
+        | otherwise     = "%d-%m-%y"
 
       headerWidget =
         (,) 1
