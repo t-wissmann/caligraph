@@ -256,38 +256,59 @@ renderRightmostBorder st day =
     (lb,j,_) = renderBorder st Nothing shifted_surroundings
 
 scrollToFocus :: St n -> St n
-scrollToFocus st = st
-  --case L.find (\(_,(ds,_,_)) -> st^.focusDay `elem` ds) (zip [0..] $ st^.rows) of
-  --  -- if the focus day is among the rows, but in the first row
-  --  Just (0,(_,_,0)) ->
-  --    -- focusDay is only fully visible if we do not have any scroll ofset
-  --    if (st^.scrollOffset > 0)
-  --    then st & scrollOffset .~ 0 & computeVisibleRows
-  --    else st
-  --  -- if the focus day is in the first row but this row is cropped at the bottom
-  --  -- then the screen is too small and we can't do anything
-  --  Just (0,(_,_,_)) ->
-  --    st
-  --  -- if the focus day is not in the first row (i.e. not cropped at the top)
-  --  -- and not cropped from the bottom, then it's already fully visible
-  --  Just (_,(_,_,0)) ->
-  --    st
-  --  -- if it is cropped at the bottom, then scroll to the top accordingly
-  --  -- the 1 is for the southern border of the focused cell
-  --  Just (_,(_,_,cb)) ->
-  --    st & scrollOffset %~ (\o -> o + cb + 1) & computeVisibleRows
-  --  -- if the focused day is not among the rows at all, then find out whether we
-  --  -- need to go to the future or past
-  --  Nothing ->
-  --    if ((st^.focusDay) `diffDays` (st^.scrollDay) > 0)
-  --    -- if focused day is in the future
-  --    then st & scrollDay .~ (st^.focusDay)
-  --            & scrollOffset .~ (daysHeight st (weekOf (st^.focusDay)) - (snd $ st^.size))
-  --            & computeVisibleRows
-  --    -- if focused day is in the past
-  --    else st & scrollDay .~ st^.focusDay
-  --            & scrollOffset .~ 0
-  --            & computeVisibleRows
+scrollToFocus st = scrollToDay st (st^.focusDay)
+
+scrollToDay :: St n -> Day -> St n
+scrollToDay st day =
+  case (st^.size) of
+    Nothing -> st
+    Just (width,height) ->
+      let rows = computeVisibleRows st (width,height) in
+      let irows = zip [0..] rows in
+      case L.find (\(_,(ds,_,_)) -> day `elem` ds) irows of
+        -- if the day is among the rows, but in the first row
+        Just (0,(_,_,0)) ->
+          -- desired day is only fully visible if we do not have any scroll offset
+          if (st^.scrollOffset > 0)
+          then st & scrollOffset .~ 0
+          else st
+        -- if the day is in the first row but this row is cropped at the bottom
+        -- then the screen is too small and we can't do anything
+        Just (0,(_,_,_)) ->
+          st
+        -- if the day is not in the first row (i.e. not cropped at the top)
+        -- and not cropped from the bottom, then it's already fully visible
+        Just (idx,(_,_,0)) ->
+          if idx + 1 == length rows
+          then
+            -- if the day is in the last row and not officially cropped,
+            -- we need to scroll by 1 to make its bottom border visible
+            st & scrollOffset %~ (\o -> o + 1)
+               & normalizeScrollDay
+          else st
+        -- if it is cropped at the bottom, then scroll to the top accordingly
+        -- the 1 is for the southern border of the focused cell
+        Just (_,(_,_,cb)) ->
+          st & scrollOffset %~ (\o -> o + cb + 1)
+             & normalizeScrollDay
+        -- if the day is not among the rows at all, then find out whether we
+        -- need to go to the future or past
+        Nothing ->
+          if (day `diffDays` (st^.scrollDay) > 0)
+          -- if focused day is in the future
+          then
+            let
+              weekHeight = daysHeight st width ((st^.rowController.rowOf) day)
+              -- the + 1 is for the bottom border of the cell
+              newOffset = (weekHeight - height + 1)
+            in
+            st & scrollDay .~ day
+               & scrollOffset .~ newOffset
+               & normalizeScrollDay
+          -- if focused day is in the past
+          else st & scrollDay .~ day
+                  & scrollOffset .~ 0
+                  & normalizeScrollDay
 
 weekOf :: Day -> [Day]
 weekOf day =
@@ -297,10 +318,28 @@ weekOf day =
 
 minimumDayHeight = 4
 
-daysHeight :: St n -> Int -> [Day] -> Int
+-- | the height of a list of days
+daysHeight
+  :: St n
+  -- ^ internal state
+  -> Int
+  -- ^ the full width of the daygrid widget
+  -> [Day]
+  -- ^ the day in question
+  -> Int
+  -- ^ day's height, including its top border
 daysHeight s width ds = foldr max minimumDayHeight $ map (dayHeight s width) ds
 
-dayHeight :: St n -> Int -> Day -> Int
+-- | the height of a specific day
+dayHeight
+  :: St n
+  -- ^ internal state
+  -> Int
+  -- ^ the full width of the daygrid widget
+  -> Day
+  -- ^ the day in question
+  -> Int
+  -- ^ day's height, including its top border
 dayHeight st width d = max minimumDayHeight (1 + (fst $ (st^.day2widget) d ((st^.rowController.dayWidth) d width)))
 
 -- | scroll the viewport by terminal rows
@@ -308,7 +347,6 @@ scroll :: Int -> St n -> St n
 scroll delta s = s
       & scrollOffset %~ ((+) delta)
       & normalizeScrollDay
-      -- & computeVisibleRows
 
 normalizeScrollDay :: St n -> St n
 normalizeScrollDay st =
@@ -385,7 +423,7 @@ moveFocusIntoView st = st
 
 gotoToday :: St n -> St n
 gotoToday st =
-    st -- & focusDay .~ (st^.today) & scrollToFocus
+    st & focusDay .~ (st^.today) & scrollToFocus
 
 rangeVisible :: St n -> (Day,Day)
 rangeVisible st =
