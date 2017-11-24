@@ -27,10 +27,17 @@ import qualified Data.Map.Strict as M
 import Data.Map.Strict (Map)
 
 import Control.Monad.Reader
+import Control.Exception.Base
 import Lens.Micro
 import Lens.Micro.TH
 import Lens.Micro.Extras (view)
 import Data.Functor.Const
+
+validate_assert :: (a -> (String,Bool)) -> a -> a
+validate_assert pred x =
+  case (pred x) of
+    (_, True) -> x
+    (str, False) -> error ("Assertion failed: " ++ str)
 
 -- | the type of a day widget
 type DayWidget n
@@ -102,6 +109,13 @@ makeLenses ''St
 
 type StDays n = LazyResult Day (DayWidget n) (St n)
 
+data ScreenRow = ScreenRow
+  { srDays :: [Day]
+  , srHeight :: Int
+  , srCropTop :: Int
+  , srCropBottom :: Int
+  }
+
 
 init
   :: n
@@ -136,15 +150,15 @@ render st =
       daywidth <- return ((fullwidth - 1) `div` 7)
       Brick.Types.render $
         computeVisibleRows st (fullwidth,height)
-        & map (\(days,height,cb) ->
+        & map (\(ScreenRow days height ct cb) ->
           map (renderDay st daywidth) days
           & flip (++) [(1, renderRightmostBorder st $ last days)]
           & map snd
           & map (setAvailableSize (daywidth,height))
+          & map (cropTopBy ct)
           & map (cropBottomBy cb)
           & hBox
         )
-        & mapHead (cropTopBy (st^.scrollOffset))
         & vBox
 
 -- | call this after this widget has been rendered
@@ -162,24 +176,46 @@ computeVisibleRows
     :: St n
     -> (Int,Int)
     -- ^ the screen size
-    -> [([Day],Int,Int)]
+    -> [ScreenRow]
     -- ^ the list of visible rows, containing their height and the number
     --   of terminal rows cropped off at the bottom
 computeVisibleRows st (fullwidth,fullheight) =
-  remainingRows firstrow (fullheight+ (st^.scrollOffset))
+  -- validate_assert (test_computeVisibleRows fullheight) $
+  reverse (rowsBefore firstrow ((-1) * (st^.scrollOffset)))
+  ++ remainingRows firstrow (max 0 (st^.scrollOffset)) (fullheight+ (st^.scrollOffset))
   where
     rc = (st^.rowController)
     firstrow = (rc^.rowOf) (st^.scrollDay)
-    remainingRows :: [Day] -> Int -> [([Day],Int,Int)]
-    remainingRows row rem_height =
+    -- return a reversed list of rows (properly) on top of the given row
+    rowsBefore :: [Day] -> Int -> [ScreenRow]
+    rowsBefore row rem_space =
+      let rowB = (rc^.previousRow) row in
+      let rowHeight = daysHeight st fullwidth rowB in
+      if rem_space <= 0 then
+        []
+      else
+        (ScreenRow rowB rowHeight (max 0 (rowHeight - rem_space)) 0)
+        : rowsBefore rowB (rem_space - rowHeight)
+
+    remainingRows :: [Day] -> Int -> Int -> [ScreenRow]
+    remainingRows row crop_top rem_height =
       let row_height = daysHeight st fullwidth row in
       if rem_height <= row_height
-      then [(row,row_height,row_height - rem_height)]
+      then [ScreenRow row row_height crop_top (row_height - rem_height)]
       else
-        (row,row_height,0)
+        (ScreenRow row row_height crop_top 0)
         : remainingRows
             (st^.rowController.nextRow $ row)
+            0
             (rem_height - row_height)
+
+test_computeVisibleRows :: Int -> [ScreenRow] -> (String,Bool)
+test_computeVisibleRows fullheight rows =
+  (,) "computeVisibleRows" $
+  rows
+  & map (\(ScreenRow _ h t b) -> h - t - b)
+  & sum
+  & (==) fullheight
 
 maybeOr :: Maybe Bool -> Maybe Bool -> Maybe Bool
 maybeOr (Just True) _  = Just True
@@ -260,36 +296,23 @@ scrollToFocus st = scrollToDay st (st^.focusDay)
 
 scrollToDay :: St n -> Day -> St n
 scrollToDay st day =
+  -- TODO: query additionaly day content if the jump is too far
   case (st^.size) of
     Nothing -> st
     Just (width,height) ->
       let rows = computeVisibleRows st (width,height) in
-      let irows = zip [0..] rows in
-      case L.find (\(_,(ds,_,_)) -> day `elem` ds) irows of
-        -- if the day is among the rows, but in the first row
-        Just (0,(_,_,0)) ->
-          -- desired day is only fully visible if we do not have any scroll offset
-          if (st^.scrollOffset > 0)
-          then st & scrollOffset .~ 0
-          else st
-        -- if the day is in the first row but this row is cropped at the bottom
-        -- then the screen is too small and we can't do anything
-        Just (0,(_,_,_)) ->
-          st
-        -- if the day is not in the first row (i.e. not cropped at the top)
-        -- and not cropped from the bottom, then it's already fully visible
-        Just (idx,(_,_,0)) ->
-          if idx + 1 == length rows
-          then
-            -- if the day is in the last row and not officially cropped,
-            -- we need to scroll by 1 to make its bottom border visible
-            st & scrollOffset %~ (\o -> o + 1)
-               & normalizeScrollDay
-          else st
-        -- if it is cropped at the bottom, then scroll to the top accordingly
-        -- the 1 is for the southern border of the focused cell
-        Just (_,(_,_,cb)) ->
-          st & scrollOffset %~ (\o -> o + cb + 1)
+      case L.find (\sr -> day `elem` srDays sr) rows of
+        -- if the day is among the rows
+        Just (ScreenRow _ _ ct cb) ->
+          -- desired day is only fully visible if it is not cropped at all
+          st & scrollOffset %~ (\o ->
+                  if (cb /= 0)
+                  then
+                    -- not only scroll by the amount cropped
+                    -- but additionally by one line to make the bottom border visible
+                    -- (the bottom border is part of the cell below)
+                    o + cb + 1
+                  else o - ct)
              & normalizeScrollDay
         -- if the day is not among the rows at all, then find out whether we
         -- need to go to the future or past
