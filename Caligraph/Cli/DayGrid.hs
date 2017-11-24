@@ -142,24 +142,26 @@ render st =
   reportExtent (st^.widgetName) $
   Widget Greedy Greedy render'
   where
+    rc = (st^.rowController)
     mapHead _ [] = []
     mapHead f (x:xs) = (f x:xs)
     render' = do
       fullwidth <- asks (view availWidthL)
       height <- asks (view availHeightL)
-      daywidth <- return ((fullwidth - 1) `div` 7)
       Brick.Types.render $
         computeVisibleRows st (fullwidth,height)
-        & map (\(ScreenRow days height ct cb) ->
-          map (renderDay st daywidth) days
-          & flip (++) [(1, renderRightmostBorder st $ last days)]
-          & map snd
-          & map (setAvailableSize (daywidth,height))
-          & map (cropTopBy ct)
-          & map (cropBottomBy cb)
-          & hBox
-        )
+        & map (renderRow fullwidth)
         & vBox
+    -- renderRow :: ScreenRow -> Int -> Widget ''n
+    renderRow fullwidth (ScreenRow days height ct cb) =
+      days
+      & map (\d -> ((rc^.dayWidth) d fullwidth, d))
+      & map (\(width,d) -> (width, snd $ renderDay st width d))
+      & flip (++) [(1, renderRightmostBorder st $ last days)]
+      & map (\(width,d) -> setAvailableSize (width,height) d)
+      & map (cropTopBy ct)
+      & map (cropBottomBy cb)
+      & hBox
 
 -- | call this after this widget has been rendered
 updateWidgetSize :: Eq n => St n -> EventM n (St n)
