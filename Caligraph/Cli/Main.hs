@@ -46,6 +46,7 @@ import Lens.Micro.TH
 
 data WidgetName =
     WNDayGrid
+    | WNDay Day
     deriving (Ord,Eq,Show)
 
 data St = St
@@ -178,16 +179,22 @@ reminder2widgetInline idx r width =
       contentString = (dropWhile (==' ') durationString) ++ CB.title r
 
 -- | return a widget for a day and its total height
-day2widget :: St -> Day -> DayGrid.DayWidget n
+day2widget :: St -> Day -> DayGrid.DayWidget WidgetName
 day2widget st day width =
     (fromMaybe [] $ safeArray (st^.visibleIncarnations) day)
     & zipWith (\i d -> widget i d width) [0..]
-    & intersperse (1, str " ") -- put empty lines in between
-    & (:) (1, str " ") -- put an empty line below header
+    & intersperse (1, str $ replicate width ' ') -- put empty lines in between
+    & (:) (1, str $ replicate width ' ') -- put an empty line below header
     & (:) headerWidget -- prepend header
+    & flip (++) [(0, fixedfill ' ')] -- we do this to have empty space clickable
     & unzip
-    & (\(a,b) -> (sum a, vBox b))
+    & (\(a,b) -> (sum a, clickable (WNDay day) $ vBox b))
     where
+      fixedfill :: Char -> Widget n
+      fixedfill ch =
+          Widget Fixed Fixed $ do
+            c <- getContext
+            return $ emptyResult & imageL .~ (V.charFill (c^.attrL) ch (c^.availWidthL) (c^.availHeightL))
       widget =
         if width < 20
         then reminder2widgetInline
@@ -249,6 +256,8 @@ mainApp =
         ]
       }
 
+scrollStep = 3
+
 myHandleEvent :: St -> BrickEvent WidgetName () -> EventM WidgetName (Next St)
 myHandleEvent s (VtyEvent e) =
   case e of
@@ -261,12 +270,18 @@ myHandleEvent s (VtyEvent e) =
     EvResize w h ->
       continue (s & dayGrid %~ DayGrid.resize (w,h) & updateDayRange)
     EvMouseDown _ _ BScrollDown _ ->
-      continue (s & dayGrid %~ DayGrid.scroll 3 & updateDayRange)
+      continue (s & dayGrid %~ DayGrid.scroll scrollStep & updateDayRange)
     EvMouseDown _ _ BScrollUp _ ->
-      continue (s & dayGrid %~ DayGrid.scroll (-3) & updateDayRange)
+      continue (s & dayGrid %~ DayGrid.scroll (-scrollStep) & updateDayRange)
     _ ->
       continue s
 myHandleEvent s (AppEvent ()) = continue s
+myHandleEvent s (MouseDown (WNDay d) BLeft _ _) =
+      continue (s & dayGrid %~ DayGrid.setFocus d & updateDayRange)
+myHandleEvent s (MouseDown _ BScrollDown _ _) =
+      continue (s & dayGrid %~ DayGrid.scroll scrollStep & updateDayRange)
+myHandleEvent s (MouseDown _ BScrollUp _ _) =
+      continue (s & dayGrid %~ DayGrid.scroll (-scrollStep) & updateDayRange)
 myHandleEvent s (MouseDown _ _ _ _) = continue s
 myHandleEvent s (MouseUp _ _ _) = continue s
 
