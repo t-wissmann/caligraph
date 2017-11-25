@@ -150,8 +150,8 @@ day2widget st day =
         (DayWidget.St
             (Just 0)
             reminders
-            today
-            day)
+            day
+            today)
     where
       today = st^.dayGrid^.DayGrid.today
       focus = st^.dayGrid^.DayGrid.focusDay
