@@ -9,6 +9,7 @@ import qualified Caligraph.Cli.UnicodeJunction as UnicodeJunction
 import Caligraph.Utils
 import Data.Maybe
 import Caligraph.LazyResult
+import Caligraph.Cli.Types
 
 import Brick
 import Brick.Widgets.Border
@@ -39,16 +40,6 @@ validate_assert pred x =
   case (pred x) of
     (_, True) -> x
     (str, False) -> error ("Assertion failed: " ++ str)
-
--- | the type of a day widget
-type DayWidget n
-    = Int
-    -- ^ the available width on the screen
-    -> (Int,Widget n)
-    -- ^ the widget and its height
-
-emptyDay :: DayWidget n
-emptyDay _ = (1, str "loading...")
 
 data Surrounding celltype = Surrounding
   { nwNeighour :: Maybe celltype -- north west neighbour
@@ -420,7 +411,6 @@ resize (w,h) s = s
     -- & scrollToFocus
 
 
-data Dir = DirUp | DirDown | DirLeft  | DirRight
 dayInDirecton :: St n -> Dir -> Day
 dayInDirecton st dir =
     flip addDays (st^.focusDay) $

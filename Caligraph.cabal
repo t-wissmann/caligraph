@@ -24,6 +24,8 @@ library
     Caligraph.LazyResult
     Caligraph.Cli.Main
     Caligraph.Cli.DayGrid
+    Caligraph.Cli.DayWidget
+    Caligraph.Cli.Types
     Caligraph.Cli.UnicodeJunction
     Caligraph.Config.Main
     Caligraph.Config.Calendars
