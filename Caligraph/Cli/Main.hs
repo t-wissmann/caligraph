@@ -6,7 +6,7 @@ module Caligraph.Cli.Main where
 import Brick
 import Brick.Widgets.Border
 import Brick.Main
-import Brick.Widgets.Core (withAttr, cropTopBy, cropBottomBy,setAvailableSize)
+import Brick.Widgets.Core (withAttr, cropTopBy, cropBottomBy,setAvailableSize,vBox,(<+>))
 import Brick.AttrMap (attrMap, AttrMap)
 import Brick.Widgets.Border.Style
 import Brick.Widgets.Center (hCenter)
@@ -70,30 +70,38 @@ binds = Map.fromList
   , (([MCtrl], KChar 'b'), c $ DayGrid.scrollPage (-0.90))
 
   -- hjkl
-  , (([], KChar 'h'), c $ DayGrid.moveFocus DirLeft)
-  , (([], KChar 'j'), c $ DayGrid.moveFocus DirDown)
-  , (([], KChar 'k'), c $ DayGrid.moveFocus DirUp)
-  , (([], KChar 'l'), c $ DayGrid.moveFocus DirRight)
+  , (([], KChar 'h'), focus_cmd DirLeft)
+  , (([], KChar 'j'), focus_cmd DirDown)
+  , (([], KChar 'k'), focus_cmd DirUp)
+  , (([], KChar 'l'), focus_cmd DirRight)
   -- arrow keys
-  , (([], KLeft ), c $ DayGrid.moveFocus DirLeft)
-  , (([], KDown ), c $ DayGrid.moveFocus DirDown)
-  , (([], KUp   ), c $ DayGrid.moveFocus DirUp)
-  , (([], KRight), c $ DayGrid.moveFocus DirRight)
+  , (([], KLeft ), focus_cmd DirLeft)
+  , (([], KDown ), focus_cmd DirDown)
+  , (([], KUp   ), focus_cmd DirUp)
+  , (([], KRight), focus_cmd DirRight)
   ]
   where c f = (\st -> continue (st & dayGrid %~ f))
+
+
+focus_cmd :: Dir -> St -> EventM WidgetName (Next St)
+focus_cmd dir st =
+    continue (st & dayGrid %~ DayGrid.moveFocus dir)
+
 
 reminder2widget :: Int -> CB.Incarnation -> Int -> (Int, Widget n)
 reminder2widget idx r width =
     ( length lines
     , updateAttrMap (applyAttrMappings [("reminder", mainAttribute)])
       $ withAttr "reminder"
-      $ Widget Greedy Fixed $ do
-        ctx <- getContext
-        return $ emptyResult & imageL .~ (reminderImage (ctx^.attrL))
+      $ vBox
+      $ map (\(d,s) -> (withAttr "reminderTime" $ str d) <+> txt s)
+      $ zip placeholder lines
     )
   where
       mainAttribute =
-        brightWhite `on` (if idx `mod` 2 == 0 then rgbColor 161 0 168 else rgbColor 99 0 103)
+        fg brightWhite
+      --mainAttribute =
+      --  brightWhite `on` (if idx `mod` 2 == 0 then rgbColor 161 0 168 else rgbColor 99 0 103)
       titleWidth = max 1 (width - durationWidth)
       lines =
         (\l -> l ++ replicate (length duration - length l) "")
@@ -105,26 +113,15 @@ reminder2widget idx r width =
         if length duration == 0
         then 0
         else (+) 1 $ maximum $ map V.safeWcswidth duration
-      placeholder_string =
-        case duration of
-            (_:_:_) -> "  |  "
-            _       -> "     "
-      placeholder =
-        replicate (max 0 $ (length lines) - (length duration)) placeholder_string
-      reminderImage attr =
-        let
-          safeTextWidth = V.safeWcswidth . T.unpack
-          durationImg =
-            V.vertCat
-            $ map (\s -> V.string attr (s ++ " "))
-            $ case duration of
-                (hd:tl) -> hd : (placeholder ++ tl)
-                [] -> []
 
-          lineImg lStr = V.string attr (lStr ++ replicate (titleWidth - V.safeWcswidth lStr) ' ')
-          lineImgs = lineImg <$> (map T.unpack lines)
-        in
-        V.horizJoin durationImg $ V.vertCat $ lineImgs
+      placeholder =
+        case duration of
+            (beg:end:[]) ->
+                ((beg++" ") : replicate (max 0 $ (length lines) - 2) "  |   ") ++ [end ++ " "]
+            (beg:[]) ->
+                ((beg++" ") : replicate (max 0 $ (length lines) - 1) "      ")
+            _ ->
+                (replicate (length lines) "")
 
       duration =
         case (CB.time r, CB.duration r) of
@@ -146,15 +143,20 @@ reminder2widget idx r width =
 
 reminder2widgetInline :: Int -> CB.Incarnation -> Int -> (Int, Widget n)
 reminder2widgetInline idx r width =
-    ( length lines
-    , updateAttrMap (applyAttrMappings [("reminder", mainAttribute)])
+    ( length formatted_lines
+    , updateAttrMap
+            (applyAttrMappings
+                [("reminder", mainAttribute)
+                ])
       $ withAttr "reminder"
-      $ txt $ T.intercalate "\n" lines
+      $ vBox formatted_lines
     )
   where
       mainAttribute =
-        brightWhite `on` (if idx `mod` 2 == 0 then rgbColor 161 0 168 else rgbColor 99 0 103)
+        fg brightWhite
+      -- bgcolor = (if idx `mod` 2 == 0 then rgbColor 161 0 168 else rgbColor 99 0 103)
       durationString =
+        dropWhile (==' ') $
         case (CB.time r, CB.duration r) of
             (Just (h,m), Just (dh,dm)) ->
                 let
@@ -171,12 +173,24 @@ reminder2widgetInline idx r width =
             (Just (h,m), Nothing) ->
                 CB.showTime ':' (h,m) ++ " "
             (_, _) -> ""
-      lines =
-        map (T.justifyLeft width ' ')
+      raw_lines =
+        map (T.unpack)
+        $ map (T.justifyLeft width ' ')
         $ wrapTextToLines (WrapSettings False True) width
         $ T.pack
-        $ contentString
-      contentString = (dropWhile (==' ') durationString) ++ CB.title r
+        $ (durationString ++ CB.title r)
+
+      formatted_lines :: [Widget n]
+      formatted_lines =
+        case raw_lines of
+            [] -> [str ""]
+            (hd:tl) ->
+                (:)
+                    ((withAttr "reminderTime" $ str durationString)
+                     <+>
+                   (str "" <+> (str (drop (length durationString) hd))))
+                    (map str tl)
+
 
 -- | return a widget for a day and its total height
 day2widget :: St -> Day -> DayGrid.DayWidget WidgetName
@@ -253,6 +267,7 @@ mainApp =
         , ("cellHeaderFocus", yellow `on` black)
         , ("cellHeaderToday", black `on` yellow)
         , ("cellHeaderFocusToday", black `on` yellow)
+        , ("reminderTime", Attr (SetTo bold) (SetTo green) KeepCurrent)
         ]
       }
 

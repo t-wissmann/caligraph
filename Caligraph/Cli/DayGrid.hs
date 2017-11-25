@@ -32,6 +32,7 @@ import Lens.Micro
 import Lens.Micro.TH
 import Lens.Micro.Extras (view)
 import Data.Functor.Const
+import Debug.Trace
 
 validate_assert :: (a -> (String,Bool)) -> a -> a
 validate_assert pred x =
