@@ -88,7 +88,7 @@ weekPerRow = RowController
         _ -> Surrounding (Just (-8)) (Just (-7)) (Just (-6)) (Just (-1))
   , _previousRow = map (addDays (-7))
   , _nextRow     = map (addDays ( 7))
-  , _dayWidth = const (`div` 7)
+  , _dayWidth = (\d fullwidth -> (fullwidth - 1) `div` 7)
   }
 
 -- | The internal state
@@ -365,7 +365,11 @@ dayHeight
   -- ^ the day in question
   -> Int
   -- ^ day's height, including its top border
-dayHeight st width d = max minimumDayHeight (1 + (fst $ (st^.day2widget) d ((st^.rowController.dayWidth) d width)))
+dayHeight st width d =
+  -- (\x -> trace (show d ++ " -> height " ++ show x) x) $
+  -- substract one column for the left border
+  -- and add one row for the top border
+  max minimumDayHeight (1 + (fst $ (st^.day2widget) d ((st^.rowController.dayWidth) d width - 1)))
 
 -- | scroll the viewport by terminal rows
 scroll :: Int -> St n -> St n
