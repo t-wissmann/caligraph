@@ -4,7 +4,7 @@ module Caligraph.Cli.Types where
 import Brick
 import Data.Time.Calendar
 
-data Dir = DirUp | DirDown | DirLeft  | DirRight
+data Dir = DirUp | DirDown | DirLeft  | DirRight deriving (Eq,Show)
 
 data WidgetName =
     WNDayGrid

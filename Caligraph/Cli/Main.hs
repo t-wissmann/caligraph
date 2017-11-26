@@ -45,7 +45,7 @@ data St = St
     { _dayGrid :: DayGrid.St WidgetName
     , _backend :: CB.Backend
     , _visibleIncarnations :: Array Day [CB.Incarnation]
-    , _focusItem :: Int -- the item focused within a day
+    , _focusItem :: Maybe Int -- the item focused within a day, Nothing means 'the last'
     }
 
 makeLenses ''St
@@ -78,10 +78,34 @@ binds = Map.fromList
 
 focus_cmd :: Dir -> St -> EventM WidgetName (Next St)
 focus_cmd dir st =
-    continue (st & dayGrid %~ DayGrid.moveFocus dir)
+    continue (
+        case reminderInDir of
+            Right idx ->
+                st & focusItem .~ Just idx
+            Left idx ->
+                st
+                & focusItem .~ idx
+                & dayGrid %~ DayGrid.moveFocus dir)
     where
       focus = st^.dayGrid^.DayGrid.focusDay
       reminders = (fromMaybe [] $ safeArray (st^.visibleIncarnations) focus)
+      focusItemConcrete =
+        case (st^.focusItem) of
+            Nothing -> length reminders - 1
+            Just idx -> idx
+      reminderInDir :: Either (Maybe Int) Int
+      reminderInDir =
+        case dir of
+            DirLeft -> Left (Just 0)
+            DirRight -> Left (Just 0)
+            DirUp ->
+                if focusItemConcrete > 0
+                then Right $ focusItemConcrete - 1
+                else Left Nothing
+            DirDown ->
+                if focusItemConcrete + 1 < length reminders
+                then Right $ focusItemConcrete + 1
+                else Left (Just 0)
 
 ui st =
   [DayGrid.render $ st^.dayGrid]
@@ -156,7 +180,7 @@ day2widget st day =
     DayWidget.day2widget
         (DayWidget.St
             (if focus == day
-              then Just (st^.focusItem)
+              then Just $ fromMaybe (length reminders - 1) (st^.focusItem)
               else Nothing)
             reminders
             day
@@ -192,7 +216,7 @@ testmain = do
         (DayGrid.init WNDayGrid today)
         backend
         (array (today,addDays (-1) today) [])
-        0)
+        (Just 0))
   return ()
 
 rightOrDie :: Either String a -> IO a
