@@ -45,6 +45,7 @@ data St = St
     { _dayGrid :: DayGrid.St WidgetName
     , _backend :: CB.Backend
     , _visibleIncarnations :: Array Day [CB.Incarnation]
+    , _focusItem :: Int -- the item focused within a day
     }
 
 makeLenses ''St
@@ -78,6 +79,9 @@ binds = Map.fromList
 focus_cmd :: Dir -> St -> EventM WidgetName (Next St)
 focus_cmd dir st =
     continue (st & dayGrid %~ DayGrid.moveFocus dir)
+    where
+      focus = st^.dayGrid^.DayGrid.focusDay
+      reminders = (fromMaybe [] $ safeArray (st^.visibleIncarnations) focus)
 
 ui st =
   [DayGrid.render $ st^.dayGrid]
@@ -97,7 +101,7 @@ tryEnableMouse = do
 mainApp :: App St () WidgetName
 mainApp =
   App { appDraw = ui
-      , appChooseCursor = const $ const Nothing
+      , appChooseCursor = showFirstCursor
       , appHandleEvent = (\s ev ->
             do
             dg <- DayGrid.updateWidgetSize (s^.dayGrid)
@@ -148,7 +152,9 @@ day2widget :: St -> Day -> DayWidget WidgetName
 day2widget st day =
     DayWidget.day2widget
         (DayWidget.St
-            (Just 0)
+            (if focus == day
+              then Just (st^.focusItem)
+              else Nothing)
             reminders
             day
             today)
@@ -182,7 +188,8 @@ testmain = do
     (St
         (DayGrid.init WNDayGrid today)
         backend
-        (array (today,addDays (-1) today) []))
+        (array (today,addDays (-1) today) [])
+        0)
   return ()
 
 rightOrDie :: Either String a -> IO a

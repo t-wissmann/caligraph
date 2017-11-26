@@ -137,17 +137,23 @@ day2widget st width =
     & (:) headerWidget -- prepend header
     & flip (++) [(0, fixedfill ' ')] -- we do this to have empty space clickable
     & unzip
-    & (\(a,b) -> (sum a, clickable (WNDay $ day st) $ vBox b))
+    & (\(a,b) -> (sum a, clickable widgetName $ vBox b))
     where
+      widgetName = (WNDay $ day st)
       fixedfill :: Char -> Widget n
       fixedfill ch =
           Widget Fixed Fixed $ do
             c <- getContext
             return $ emptyResult & imageL .~ (V.charFill (c^.attrL) ch (c^.availWidthL) (c^.availHeightL))
-      widget =
-        if width < 20
-        then reminder2widgetInline
-        else reminder2widget
+
+      widget :: Int -> CB.Incarnation -> Int -> (Int, Widget WidgetName)
+      widget idx inc w=
+        (if Just idx == (focus st)
+        then (\(a,b) -> (a, showCursor widgetName (Location (w-1,a-1)) b))
+        else id)
+        (if width < 20
+        then reminder2widgetInline idx inc w
+        else reminder2widget idx inc w)
       headerAttr
         | (isJust $ focus $ st) && (day st == today st) = "cellHeaderFocusToday"
         | (isJust $ focus $ st)  = "cellHeaderFocus"
