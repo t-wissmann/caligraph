@@ -21,6 +21,9 @@ library
     Caligraph.Remind.Parser
     Caligraph.Remind.Types
     Caligraph.Remind.Backend
+    Caligraph.RemindPipe.Parser
+    Caligraph.RemindPipe.Types
+    Caligraph.RemindPipe.Backend
     Caligraph.LazyResult
     Caligraph.Cli.Main
     Caligraph.Cli.DayGrid
