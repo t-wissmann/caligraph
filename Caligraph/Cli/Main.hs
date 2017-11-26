@@ -115,7 +115,10 @@ mainApp =
         , ("cellHeaderFocus", yellow `on` black)
         , ("cellHeaderToday", black `on` yellow)
         , ("cellHeaderFocusToday", black `on` yellow)
+        , ("reminderTitle", defAttr)
         , ("reminderTime", Attr (SetTo bold) (SetTo green) KeepCurrent)
+        , ("selectedReminderTitle", bg black)
+        , ("selectedReminderTime", Attr (SetTo bold) (SetTo green) (SetTo black))
         ]
       }
 

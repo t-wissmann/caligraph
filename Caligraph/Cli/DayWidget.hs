@@ -35,7 +35,7 @@ data St = St
 reminder2widget :: Int -> CB.Incarnation -> Int -> (Int, Widget n)
 reminder2widget idx r width =
     ( length lines
-    , withAttr "reminder"
+    , withAttr "reminderTitle"
       $ vBox
       $ map (\(d,s) -> (withAttr "reminderTime" $ str d) <+> txt s)
       $ zip placeholder lines
@@ -45,7 +45,8 @@ reminder2widget idx r width =
       --  brightWhite `on` (if idx `mod` 2 == 0 then rgbColor 161 0 168 else rgbColor 99 0 103)
       titleWidth = max 1 (width - durationWidth)
       lines =
-        (\l -> l ++ replicate (length duration - length l) "")
+        map (T.justifyLeft titleWidth ' ')
+        $ (\l -> l ++ replicate (length duration - length l) "")
         $ wrapTextToLines
             (WrapSettings False True)
             titleWidth
@@ -85,7 +86,7 @@ reminder2widget idx r width =
 reminder2widgetInline :: Int -> CB.Incarnation -> Int -> (Int, Widget n)
 reminder2widgetInline idx r width =
     ( length formatted_lines
-    , withAttr "reminder"
+    , withAttr "reminderTitle"
       $ vBox formatted_lines
     )
   where
@@ -149,7 +150,15 @@ day2widget st width =
       widget :: Int -> CB.Incarnation -> Int -> (Int, Widget WidgetName)
       widget idx inc w=
         (if Just idx == (focus st)
-        then (\(a,b) -> (a, showCursor widgetName (Location (w-1,a-1)) b))
+        then (\(a,b) ->
+            ( a
+            , showCursor widgetName (Location (w-1,a-1))
+                $ updateAttrMap
+                    (mapAttrNames [ ("selectedReminderTime", "reminderTime")
+                                  , ("selectedReminderTitle", "reminderTitle")
+                                  ])
+                $ b
+            ))
         else id)
         (if width < 20
         then reminder2widgetInline idx inc w
