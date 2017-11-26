@@ -127,13 +127,13 @@ reminder2widgetInline idx r width =
                    (str "" <+> (str (drop (length durationString) hd))))
                     (map str tl)
 
-
 -- | return a widget for a day and its total height
 day2widget :: St -> DayWidget WidgetName
 day2widget st width =
     (reminders st)
     & zipWith (\i d -> widget i d width) [0..]
     & intersperse (1, str $ replicate width ' ') -- put empty lines in between
+    & (if (null $ reminders st) then (:) focusIndicator else id)
     & (:) (1, str $ replicate width ' ') -- put an empty line below header
     & (:) headerWidget -- prepend header
     & flip (++) [(0, fixedfill ' ')] -- we do this to have empty space clickable
@@ -182,4 +182,13 @@ day2widget st width =
             $ hCenter
             $ str
             $ formatTime defaultTimeLocale day_format (day st)
+
+      -- if there is no reminder
+      focusIndicator =
+        if isJust (focus st)
+        then (1, showCursor widgetName (Location (0, 0))
+                 -- $ withAttr "selectedReminderTitle"
+                 $ str
+                 $ replicate width ' ')
+        else (1, emptyWidget)
 
