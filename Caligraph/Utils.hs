@@ -1,5 +1,8 @@
 module Caligraph.Utils where
 
+import System.Directory (getHomeDirectory)
+import System.FilePath (joinPath)
+
 import Data.Array as A
 
 lastSafe :: [a] -> Maybe a
@@ -15,3 +18,12 @@ safeArray arr i =
   else Nothing
   where
     (f,t) = A.bounds arr
+
+expandTilde :: FilePath -> IO FilePath
+expandTilde s =
+    case s of
+     ['~'] -> getHomeDirectory
+     ('~':'/':tl) -> do
+        home <- getHomeDirectory
+        return $ joinPath [home, tl]
+     x -> return x

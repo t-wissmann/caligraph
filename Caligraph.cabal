@@ -17,13 +17,16 @@ library
   exposed-modules:
     Caligraph.Utils
     Caligraph.Lib
-    Caligraph.Backend
+    Caligraph.Backend.Types
+    Caligraph.Backend.Utils
+    Caligraph.Backend.Registered
     Caligraph.Remind.Parser
     Caligraph.Remind.Types
     Caligraph.Remind.Backend
     Caligraph.RemindPipe.Parser
     Caligraph.RemindPipe.Types
     Caligraph.RemindPipe.Backend
+    Caligraph.Calendar
     Caligraph.LazyResult
     Caligraph.Cli.Main
     Caligraph.Cli.DayGrid
@@ -41,6 +44,7 @@ library
     , containers
     , microlens
     , microlens-th
+    , microlens-mtl
     , array
     , mtl
     , contravariant

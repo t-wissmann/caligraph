@@ -16,8 +16,11 @@ import qualified Caligraph.Cli.DayWidget as DayWidget
 
 import Caligraph.Utils
 import qualified Caligraph.Config.Calendars as Config
+import qualified Caligraph.Backend.Types as CB
+import qualified Caligraph.Calendar as CC
 
 import Control.Monad (when)
+import Control.Monad.State (runState, get)
 import Control.Monad.IO.Class (liftIO)
 import Data.Array
 import Data.Maybe
@@ -31,21 +34,18 @@ import Graphics.Vty.Input.Events
 import Graphics.Vty (outputIface)
 import Graphics.Vty.Output.Interface (supportsMode,Mode(Mouse),setMode)
 import qualified Data.Map.Strict as Map
-import qualified Caligraph.Backend as CB
-import qualified Caligraph.Remind.Backend as Remind
 import System.Exit
 import System.Environment (getArgs)
-import System.Directory (getHomeDirectory)
-import System.FilePath (joinPath)
 
 import Lens.Micro
 import Lens.Micro.TH
+import Lens.Micro.Mtl
 
 data St = St
     { _dayGrid :: DayGrid.St WidgetName
-    , _backend :: CB.Backend
     , _visibleIncarnations :: Array Day [CB.Incarnation]
     , _focusItem :: Maybe Int -- the item focused within a day, Nothing means 'the last'
+    , _calendar :: CC.Calendar
     }
 
 makeLenses ''St
@@ -191,12 +191,14 @@ day2widget st day =
       reminders = (fromMaybe [] $ safeArray (st^.visibleIncarnations) day)
 
 updateDayRange :: St -> St
-updateDayRange st =
-    st
-    & (if day_range == bounds (st^.visibleIncarnations)
-      then id
-      else visibleIncarnations .~ CB.query (st^.backend) day_range)
-    & (\s -> s & dayGrid %~ (DayGrid.resizeDays $ day2widget s))
+updateDayRange st = st &~ do
+    if day_range == bounds (st^.visibleIncarnations)
+      then return ()
+      else do
+        incs <- zoom calendar $ CC.query day_range
+        visibleIncarnations .= incs
+    s <- get
+    dayGrid %= (DayGrid.resizeDays $ day2widget s)
     where
     day_range = (DayGrid.rangeVisible $ st^.dayGrid)
 
@@ -208,26 +210,20 @@ testmain = do
         return v
   today <- DayGrid.getToday
   args <- getArgs
-  calendars <- Config.load >>= rightOrDie
-  p <- (expandTilde $ Config.path $ snd $ calendars !! 0)
-  backend <- Remind.init p
+  raw_calendars <- Config.load >>= rightOrDie
+  cal <- rightOrDie $ CC.fromConfig (snd $ raw_calendars !! 0)
+  cal_loaded <-
+    case CC.dequeueIO cal of
+        Nothing -> return cal
+        Just io_action -> io_action
   customMain buildVty Nothing mainApp
     (St
         (DayGrid.init WNDayGrid today)
-        backend
         (array (today,addDays (-1) today) [])
-        (Just 0))
+        (Just 0)
+        cal_loaded)
   return ()
 
 rightOrDie :: Either String a -> IO a
 rightOrDie = either die return
-
-expandTilde :: FilePath -> IO FilePath
-expandTilde s =
-    case s of
-     ['~'] -> getHomeDirectory
-     ('~':'/':tl) -> do
-        home <- getHomeDirectory
-        return $ joinPath [home, tl]
-     x -> return x
 

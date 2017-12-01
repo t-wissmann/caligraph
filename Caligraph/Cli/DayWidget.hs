@@ -5,7 +5,8 @@ module Caligraph.Cli.DayWidget where
 
 import Caligraph.Cli.Types
 import Caligraph.Utils
-import qualified Caligraph.Backend as CB
+import qualified Caligraph.Backend.Types as CB
+import qualified Caligraph.Backend.Utils as CB
 
 import Brick
 import Brick.Main

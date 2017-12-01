@@ -3,10 +3,13 @@ module Caligraph.Remind.Backend where
 
 import Caligraph.Remind.Parser
 import Caligraph.Remind.Types
+import Caligraph.Utils
+
 import Data.Either
 import Data.Maybe
 import Control.Monad.Identity
-import qualified Caligraph.Backend as CB
+import qualified Caligraph.Backend.Types as CB
+import qualified Caligraph.Backend.Utils as CB
 import Data.Time.Calendar (Day,addDays,diffDays,fromGregorian,gregorianMonthLength)
 
 algorithm :: REM -> CB.Item
@@ -25,6 +28,7 @@ algorithm (REM args msg) =
             (findRemArg AT args)
             (findRemArg DURATION args)
             msg
+            "todo"
         | d <- incarnationDays args startDatePartial f t
         ]
 
@@ -122,10 +126,20 @@ partialDateLifeTime pdate =
         ( Nothing
         , Nothing)
 
-init :: String -> IO CB.Backend
-init path = do
-  reminders <- parseFile path
-  return $ CB.Backend $ extract_rems $ reminders
+data Config = Config String
+type St = Either Config [CB.Item]
+
+parseConfig :: (String -> Maybe String) -> Either String Config
+parseConfig cfg =
+    case (cfg "path") of
+        Just path -> return $ Config path
+        Nothing -> Left "Mandatory setting 'path' missing"
+
+load :: Config -> IO [CB.Item]
+load (Config path) = do
+  path' <- expandTilde path
+  reminders <- parseFile path'
+  return $ extract_rems $ reminders
   where
     extract_rems :: [Either e (i,RFLine)] -> [CB.Item]
     extract_rems = map algorithm . mapMaybe isRem . map snd . rights
@@ -133,5 +147,6 @@ init path = do
     isRem (Rem r) = Just r
     isRem _ = Nothing
 
-
+backend :: CB.Backend (Either Config [CB.Item])
+backend = CB.static_backend parseConfig load
 

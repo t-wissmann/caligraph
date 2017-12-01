@@ -7,13 +7,14 @@ import Data.Text.IO as T
 import Data.Ini
 import System.Environment.XDG.BaseDir
 
-data Calendar = Calendar
-    { path :: FilePath
+data CalendarConfig = CalendarConfig
+    { backendType :: String
+    , allSettings :: HashMap Text Text
     }
 
-type CalList = [(Text, Calendar)]
+type RawCalList = [(Text, CalendarConfig)]
 
-load :: IO (Either String CalList)
+load :: IO (Either String RawCalList)
 load = do
     path <- getUserConfigFile "caligraph" "calendars.ini"
     src <- T.readFile path
@@ -30,9 +31,9 @@ mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f (Left b) = Left $ f b
 mapLeft _ (Right b) = Right b
 
-parseCalendar :: HashMap Text Text -> Either String Calendar
+parseCalendar :: HashMap Text Text -> Either String CalendarConfig
 parseCalendar section =
-    return Calendar <*> f "path"
+    return CalendarConfig <*> f "type" <*> pure section
     where f = field section
 
 field :: HashMap Text Text -> String -> Either String String
