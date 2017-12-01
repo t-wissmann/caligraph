@@ -167,7 +167,9 @@ myHandleEvent s (VtyEvent e) =
       continue s
 myHandleEvent s (AppEvent ()) = continue s
 myHandleEvent s (MouseDown (WNDay d) BLeft _ _) =
-      continue (s & dayGrid %~ DayGrid.setFocus d & updateDayRange)
+      continue (s & dayGrid %~ DayGrid.setFocus d & focusItem .~ Just 0 & updateDayRange)
+myHandleEvent s (MouseDown (WNDayItem d idx) BLeft _ _) =
+      continue (s & dayGrid %~ DayGrid.setFocus d & focusItem .~ Just idx & updateDayRange)
 myHandleEvent s (MouseDown _ BScrollDown _ _) =
       continue (s & dayGrid %~ DayGrid.scroll scrollStep & updateDayRange)
 myHandleEvent s (MouseDown _ BScrollUp _ _) =

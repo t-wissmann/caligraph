@@ -9,6 +9,7 @@ data Dir = DirUp | DirDown | DirLeft  | DirRight deriving (Eq,Show)
 data WidgetName =
     WNDayGrid
     | WNDay Day
+    | WNDayItem Day Int
     deriving (Ord,Eq,Show)
 
 -- | the type of a day widget

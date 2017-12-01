@@ -161,6 +161,7 @@ day2widget st width =
                 $ b
             ))
         else id)
+        $ (\(a,b) -> (a, clickable (WNDayItem (day st) idx) b))
         (if width < 20
         then reminder2widgetInline idx inc w
         else reminder2widget idx inc w)
