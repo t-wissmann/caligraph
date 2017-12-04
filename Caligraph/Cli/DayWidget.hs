@@ -27,13 +27,13 @@ import Data.Array
 
 data St = St
     { focus :: Maybe Int -- if this day has the keyboard focus
-    , reminders :: [CB.Incarnation]
+    , reminders :: [CB.Incarnation']
     , day :: Day
     , today :: Day
     }
 
 
-reminder2widget :: Int -> CB.Incarnation -> Int -> (Int, Widget n)
+reminder2widget :: Int -> CB.Incarnation' -> Int -> (Int, Widget n)
 reminder2widget idx r width =
     ( length lines
     , withAttr "reminderTitle"
@@ -84,7 +84,7 @@ reminder2widget idx r width =
                 [CB.showTime ':' (h,m) ]
             (_, _) -> []
 
-reminder2widgetInline :: Int -> CB.Incarnation -> Int -> (Int, Widget n)
+reminder2widgetInline :: Int -> CB.Incarnation' -> Int -> (Int, Widget n)
 reminder2widgetInline idx r width =
     ( length formatted_lines
     , withAttr "reminderTitle"
@@ -148,7 +148,7 @@ day2widget st width =
             c <- getContext
             return $ emptyResult & imageL .~ (V.charFill (c^.attrL) ch (c^.availWidthL) (c^.availHeightL))
 
-      widget :: Int -> CB.Incarnation -> Int -> (Int, Widget WidgetName)
+      widget :: Int -> CB.Incarnation' -> Int -> (Int, Widget WidgetName)
       widget idx inc w=
         (if Just idx == (focus st)
         then (\(a,b) ->

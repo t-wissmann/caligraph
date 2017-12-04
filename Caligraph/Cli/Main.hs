@@ -43,7 +43,7 @@ import Lens.Micro.Mtl
 
 data St = St
     { _dayGrid :: DayGrid.St WidgetName
-    , _visibleIncarnations :: Array Day [CB.Incarnation]
+    , _visibleIncarnations :: Array Day [CB.Incarnation']
     , _focusItem :: Maybe Int -- the item focused within a day, Nothing means 'the last'
     , _calendar :: CC.Calendar
     }

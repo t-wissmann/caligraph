@@ -36,7 +36,7 @@ lifetimeIntersects (f,t) (ml,mr) =
 inLifetime :: Day -> (Maybe Day, Maybe Day) -> Bool
 inLifetime d range = lifetimeIntersects (d,d) range
 
-query_items :: [Item] -> (Day,Day) -> Array Day [Incarnation]
+query_items :: Ord i => [Item i] -> (Day,Day) -> Array Day [Incarnation i]
 query_items items (from,to)
     = accumArray (flip (:)) [] (from,to)
     -- we need to sort in reverse order,
@@ -50,11 +50,12 @@ query_items items (from,to)
     where same f x y = f x == f y
 
 static_backend
-    :: ((String -> Maybe String) -> Either String config)
+    :: Ord i
+    => ((String -> Maybe String) -> Either String config)
     -- ^ the config loader
-    -> (config -> IO [Item])
+    -> (config -> IO [Item i])
     -- ^ initialization procedure
-    -> Backend (Either config [Item])
+    -> Backend i (Either config [Item i])
 static_backend configparser initializer = Backend
     { query = (\dayRange -> do
             st <- get

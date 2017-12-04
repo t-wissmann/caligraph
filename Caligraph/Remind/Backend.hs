@@ -12,12 +12,19 @@ import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
 import Data.Time.Calendar (Day,addDays,diffDays,fromGregorian,gregorianMonthLength)
 
-algorithm :: REM -> CB.Item
-algorithm (REM args msg) =
+import Data.Hashable
+
+data Config = Config String
+type ItemID = (String,Int) -- filepath, linenumber
+type St = Either Config [CB.Item ItemID]
+
+algorithm :: itemid -> REM -> CB.Item itemid
+algorithm itemid (REM args msg) =
    CB.Item
   { CB.lifetime =
         repetitionLifeTime args startDatePartial
   , CB.incarnations = incs
+  , CB.identifier = itemid
   }
   where
     startDatePartial =
@@ -28,7 +35,7 @@ algorithm (REM args msg) =
             (findRemArg AT args)
             (findRemArg DURATION args)
             msg
-            "todo"
+            itemid
         | d <- incarnationDays args startDatePartial f t
         ]
 
@@ -126,27 +133,24 @@ partialDateLifeTime pdate =
         ( Nothing
         , Nothing)
 
-data Config = Config String
-type St = Either Config [CB.Item]
-
 parseConfig :: (String -> Maybe String) -> Either String Config
 parseConfig cfg =
     case (cfg "path") of
         Just path -> return $ Config path
         Nothing -> Left "Mandatory setting 'path' missing"
 
-load :: Config -> IO [CB.Item]
+load :: Config -> IO [CB.Item ItemID]
 load (Config path) = do
   path' <- expandTilde path
   reminders <- parseFile path'
   return $ extract_rems $ reminders
   where
-    extract_rems :: [Either e (i,RFLine)] -> [CB.Item]
-    extract_rems = map algorithm . mapMaybe isRem . map snd . rights
-    isRem :: RFLine -> Maybe REM
-    isRem (Rem r) = Just r
+    extract_rems :: [Either e (i,RFLine)] -> [CB.Item (String,i)]
+    extract_rems = map (uncurry algorithm) . mapMaybe isRem . rights
+    isRem :: (i,RFLine) -> Maybe ((String,i),REM)
+    isRem (i,Rem r) = Just ((path,i),r)
     isRem _ = Nothing
 
-backend :: CB.Backend (Either Config [CB.Item])
+backend :: CB.Backend ItemID St
 backend = CB.static_backend parseConfig load
 

@@ -6,7 +6,12 @@ import Caligraph.Backend.Types (Backend)
 
 import qualified Caligraph.Remind.Backend as Remind
 
-data SomeBackend = forall b. SomeBackend (Backend b)
+import Data.Hashable
+
+data SomeBackend = forall identType backendState.
+    (Eq identType, Hashable identType) =>
+        SomeBackend (Backend identType backendState)
+
 backends :: [(String, SomeBackend)]
 backends =
     [ b "remind" Remind.backend
