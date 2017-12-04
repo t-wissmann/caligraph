@@ -62,7 +62,7 @@ data Backend i state = Backend
   { query :: (Day,Day) -> State state (Incarnations i)
   -- ^ querying a certain day range, return a list of (cached) incarnations
   , dequeueIO :: state -> Maybe (IO state)
-  -- , editExternally :: i -> StateT state IO ()
+  , editExternally :: i -> StateT state IO ()
   -- ^ given the identfier, edit an item externally in an editor
   , create :: (String -> Maybe String) -> Either String state
   -- ^ create a new instance given the config

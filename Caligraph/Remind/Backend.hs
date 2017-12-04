@@ -16,7 +16,7 @@ import Data.Hashable
 
 data Config = Config String
 type ItemID = (String,Int) -- filepath, linenumber
-type St = Either Config [CB.Item ItemID]
+type St = (Config, Maybe [CB.Item ItemID])
 
 algorithm :: itemid -> REM -> CB.Item itemid
 algorithm itemid (REM args msg) =
@@ -143,14 +143,16 @@ load :: Config -> IO [CB.Item ItemID]
 load (Config path) = do
   path' <- expandTilde path
   reminders <- parseFile path'
-  return $ extract_rems $ reminders
+  return
+    $ map (uncurry algorithm)
+    $ map (\(i,r) -> ((path',i),r))
+    $ mapMaybe isRem
+    $ rights reminders
   where
-    extract_rems :: [Either e (i,RFLine)] -> [CB.Item (String,i)]
-    extract_rems = map (uncurry algorithm) . mapMaybe isRem . rights
-    isRem :: (i,RFLine) -> Maybe ((String,i),REM)
-    isRem (i,Rem r) = Just ((path,i),r)
+    isRem :: (i,RFLine) -> Maybe (i,REM)
+    isRem (i,Rem r) = Just (i,r)
     isRem _ = Nothing
 
 backend :: CB.Backend ItemID St
-backend = CB.static_backend parseConfig load
+backend = CB.static_backend parseConfig load id
 

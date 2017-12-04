@@ -35,11 +35,11 @@ data Calendar = forall identType stateType.
     (Eq identType, Hashable identType) =>
         Calendar (RawCalendar identType stateType)
 
-doCalendar :: (forall i a. (Eq i, Hashable i) =>
-    State (RawCalendar i a) r) -> State Calendar r
+doCalendar :: Monad m => (forall i a. (Eq i, Hashable i) =>
+    StateT (RawCalendar i a) m r) -> StateT Calendar m r
 doCalendar computation = do
     Calendar rc <- get
-    let (r, rc') = runState computation rc
+    (r, rc') <- lift $ runStateT computation rc
     put (Calendar rc')
     return r
 
@@ -81,5 +81,12 @@ dequeueIO (Calendar (RawCalendar st be istore)) = do
         st' <- io_action
         return $ Calendar $ RawCalendar st' be istore
 
+editExternally :: PS.Ptr -> StateT Calendar IO ()
+editExternally ptr = doCalendar $ do
+    identifier <- zoom idStore $ PS.resolve ptr
+    -- st <- get
+    -- be <- return (st^.calBackend)
+    be <- use calBackend
+    zoom calState $ CB.editExternally be identifier
 
 

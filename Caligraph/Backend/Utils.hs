@@ -6,10 +6,15 @@ import Caligraph.Backend.Types
 import Data.Time.Calendar (Day)
 import Data.Time.Calendar (Day,addDays,diffDays)
 
-import Control.Monad.State(get)
+import Control.Monad.State (gets, lift, put)
+
+import System.FilePath
+import System.Environment
+import System.Process
 
 import Text.Printf
 import Data.Ord
+import Data.Maybe
 import Data.Array
 import qualified Data.List as List
 
@@ -55,17 +60,26 @@ static_backend
     -- ^ the config loader
     -> (config -> IO [Item i])
     -- ^ initialization procedure
-    -> Backend i (Either config [Item i])
-static_backend configparser initializer = Backend
+    -> (i -> (FilePath,Int))
+    -- ^ mapping of item ids to files and line numbers
+    -> Backend i (config, Maybe [Item i])
+static_backend configparser initializer item2file = Backend
     { query = (\dayRange -> do
-            st <- get
-            return $ case st of
-                Left _ -> query_items [] dayRange
-                Right items -> query_items items dayRange)
+            items <- gets (fromMaybe [] . snd)
+            return $ query_items items dayRange)
     , dequeueIO = (\st ->
             case st of
-                Left config -> Just $ fmap Right $ initializer config
-                Right _ -> Nothing)
-    , create = fmap Left . configparser
+                (_, Just _) ->
+                    Nothing
+                (config, Nothing) ->
+                    Just $ return (\x -> (,) config $ Just x) <*> initializer config)
+    , create = fmap (flip (,) Nothing) . configparser
+    , editExternally = (\i ->
+            let (file,line) = item2file i in do
+            editor <- fmap (fromMaybe "vi") $ lift $ lookupEnv "EDITOR"
+            lift $ callProcess editor ["+" ++ show line, file]
+            st <- gets fst
+            put (st, Nothing) -- discard items to force reload
+        )
     }
 

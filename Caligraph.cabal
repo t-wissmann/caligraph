@@ -55,6 +55,7 @@ library
     , directory
     , filepath
     , xdg-basedir
+    , process
     , unordered-containers
     , hashable
   default-language:    Haskell2010

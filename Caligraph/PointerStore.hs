@@ -36,7 +36,7 @@ empty = PointerStore M.empty M.empty 1024
 
 -- If the given 'a' is in the PointerStore, return its index,
 -- otherwise insert it and assign it the next free Int
-lookup :: (Eq a, Hashable a) => a -> State (PointerStore a) Ptr
+lookup :: Monad m => (Eq a, Hashable a) => a -> StateT (PointerStore a) m Ptr
 lookup a = do
     p2d <- use data2ptr
     case M.lookup a p2d of
@@ -49,7 +49,7 @@ lookup a = do
             ptr2data %= M.insert p a
             return $ Ptr p
 
-resolve :: Ptr -> State (PointerStore a) a
+resolve :: Monad m => Ptr -> StateT (PointerStore a) m a
 resolve (Ptr p) = do
     d2p <- use ptr2data
     case M.lookup p d2p of

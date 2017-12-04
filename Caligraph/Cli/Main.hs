@@ -20,10 +20,11 @@ import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Calendar as CC
 
 import Control.Monad (when)
-import Control.Monad.State (runState, get)
+import Control.Monad.State
 import Control.Monad.IO.Class (liftIO)
 import Data.Array
 import Data.Maybe
+import Data.Functor.Identity
 import qualified Caligraph.Cli.UnicodeJunction as UJ
 
 import qualified Data.Text as T
@@ -55,6 +56,7 @@ binds :: Map.Map ([Modifier],Key) (St -> EventM WidgetName (Next St))
 binds = Map.fromList
   [ (([], KEsc), halt)
   , (([], KChar 'q'), halt)
+  , (([], KChar 'e'), edit_externally_cmd)
   , (([], KChar 'o'), c $ DayGrid.gotoToday)
 
   , (([MCtrl], KChar 'd'), c $ DayGrid.scrollPage 0.45)
@@ -106,6 +108,33 @@ focus_cmd dir st =
                 if focusItemConcrete + 1 < length reminders
                 then Right $ focusItemConcrete + 1
                 else Left (Just 0)
+
+edit_externally_cmd :: St -> EventM WidgetName (Next St)
+edit_externally_cmd st =
+    suspendAndResume $ execStateT io_action st
+    where
+        io_action :: StateT St IO ()
+        io_action = do
+            day <- use (dayGrid . DayGrid.focusDay)
+            incs <- use visibleIncarnations
+            let rems = (fromMaybe [] $ safeArray incs day)
+            idx <- fmap (fromMaybe $ length rems - 1) $ use focusItem
+            if idx >= 0 && idx < length rems
+            then do
+                let p = CB.itemId $ rems !! idx
+                zoom calendar $ CC.editExternally p
+                dequeueIO
+            else return ()
+
+dequeueIO :: StateT St IO ()
+dequeueIO = do
+    c <- use calendar
+    case CC.dequeueIO c of
+        Nothing -> return ()
+        Just io_action -> do
+            c' <- lift $ io_action
+            calendar .= c'
+            updateDayRange' True
 
 ui st =
   [DayGrid.render $ st^.dayGrid]
@@ -193,16 +222,22 @@ day2widget st day =
       reminders = (fromMaybe [] $ safeArray (st^.visibleIncarnations) day)
 
 updateDayRange :: St -> St
-updateDayRange st = st &~ do
-    if day_range == bounds (st^.visibleIncarnations)
+updateDayRange = execState $ updateDayRange' False
+
+embed :: Monad m => State s r -> StateT s m r
+embed = mapStateT (return . runIdentity)
+
+updateDayRange' :: Monad m => Bool -> StateT St m ()
+updateDayRange' force = do
+    day_range <- fmap DayGrid.rangeVisible $ use dayGrid
+    incs <- use visibleIncarnations
+    if (day_range == bounds incs) && not force
       then return ()
       else do
-        incs <- zoom calendar $ CC.query day_range
-        visibleIncarnations .= incs
+        incs' <- zoom calendar $ embed $ CC.query day_range
+        visibleIncarnations .= incs'
     s <- get
     dayGrid %= (DayGrid.resizeDays $ day2widget s)
-    where
-    day_range = (DayGrid.rangeVisible $ st^.dayGrid)
 
 testmain :: IO ()
 testmain = do
