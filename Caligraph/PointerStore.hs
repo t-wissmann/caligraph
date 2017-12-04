@@ -1,11 +1,18 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Caligraph.PointerStore where
+module Caligraph.PointerStore (
+    Ptr,
+    PointerStore,
+    empty,
+    lookup,
+    resolve,
+) where
+
+import Prelude hiding (lookup)
+import Data.Hashable
 
 import qualified Data.HashMap.Strict as M
-
 import Control.Monad.State
-import Data.Hashable
 
 import Lens.Micro
 import Lens.Micro.TH
