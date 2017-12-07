@@ -33,14 +33,11 @@ rfLine =
             x <- parser
             return (constructor x)
 
+
 month :: GenParser Char st Int
 month =
   pmonth
   where
-    month_names =
-      [ "Jan", "Feb", "Mar", "Apr", "May", "Jun"
-      , "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-      ]
     pmonth =
       foldl1 (<|>) $
       map (\(idx,name) -> (try (string name) >> return idx)) $

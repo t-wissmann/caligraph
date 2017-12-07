@@ -57,6 +57,7 @@ binds = Map.fromList
   [ (([], KEsc), halt)
   , (([], KChar 'q'), halt)
   , (([], KChar 'e'), edit_externally_cmd)
+  , (([], KChar 'a'), add_reminder_cmd)
   , (([], KChar 'o'), c $ DayGrid.gotoToday)
 
   , (([MCtrl], KChar 'd'), c $ DayGrid.scrollPage 0.45)
@@ -125,6 +126,17 @@ edit_externally_cmd st =
                 zoom calendar $ CC.editExternally p
                 dequeueIO
             else return ()
+
+add_reminder_cmd :: St -> EventM WidgetName (Next St)
+add_reminder_cmd st =
+    suspendAndResume $ execStateT io_action st
+    where
+        io_action :: StateT St IO ()
+        io_action = do
+            day <- use (dayGrid . DayGrid.focusDay)
+            let title = "New Reminder"
+            zoom calendar $ CC.addReminder $ CB.PartialReminder day title Nothing Nothing Nothing
+            dequeueIO
 
 dequeueIO :: StateT St IO ()
 dequeueIO = do

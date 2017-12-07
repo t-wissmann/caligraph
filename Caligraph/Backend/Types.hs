@@ -47,6 +47,15 @@ instance Ord i => Ord (Incarnation i) where
             LT -> Left LT
             GT -> Left GT
 
+data PartialReminder = PartialReminder
+    { prDay :: Day
+    , prTitle :: String
+    , prTime :: Maybe (Int,Int)
+    , prDuration :: Maybe (Int,Int)
+    , prUntil :: Maybe (Day,Int)
+    -- ^ if the reminder spans multiple days
+    }
+
 data Item i = Item
   { lifetime :: (Maybe Day, Maybe Day)
   -- ^ the interval in which incarnations of this reminder live
@@ -64,6 +73,8 @@ data Backend i state = Backend
   , dequeueIO :: state -> Maybe (IO state)
   , editExternally :: i -> StateT state IO ()
   -- ^ given the identfier, edit an item externally in an editor
+  , addReminder :: PartialReminder -> StateT state IO ()
+  -- ^ given a partial reminder, add the specified item to the calendar
   , create :: (String -> Maybe String) -> Either String state
   -- ^ create a new instance given the config
   }

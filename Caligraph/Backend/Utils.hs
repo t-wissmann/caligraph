@@ -3,10 +3,14 @@ module Caligraph.Backend.Utils where
 
 import Caligraph.Backend.Types
 
+import Caligraph.Utils
+
 import Data.Time.Calendar (Day)
 import Data.Time.Calendar (Day,addDays,diffDays)
 
-import Control.Monad.State (gets, lift, put)
+import Control.Monad.State (get, gets, lift, put,StateT,mapStateT)
+import Control.Monad.Reader (Reader,withReader,ReaderT,runReaderT)
+import Data.Functor.Identity
 
 import System.FilePath
 import System.Environment
@@ -54,6 +58,11 @@ query_items items (from,to)
     $ items
     where same f x y = f x == f y
 
+read_only :: Monad m => ReaderT s m r -> StateT s m r
+read_only computation = do
+    s <- get
+    lift $ runReaderT computation s
+
 static_backend
     :: Ord i
     => ((String -> Maybe String) -> Either String config)
@@ -62,8 +71,10 @@ static_backend
     -- ^ initialization procedure
     -> (i -> (FilePath,Int))
     -- ^ mapping of item ids to files and line numbers
+    -> (PartialReminder -> Reader config (FilePath,String))
+    -- ^ a reminder template
     -> Backend i (config, Maybe [Item i])
-static_backend configparser initializer item2file = Backend
+static_backend configparser initializer item2file remTemplate = Backend
     { query = (\dayRange -> do
             items <- gets (fromMaybe [] . snd)
             return $ query_items items dayRange)
@@ -81,5 +92,15 @@ static_backend configparser initializer item2file = Backend
             st <- gets fst
             put (st, Nothing) -- discard items to force reload
         )
+    , addReminder = (\prem -> do
+        (filepath, line) <- mapStateT (return . runIdentity)
+                            $ read_only
+                            $ withReader fst
+                            $ remTemplate prem
+        filepath' <- lift $ expandTilde filepath
+        lift $ appendFile filepath' line
+        config <- gets fst
+        put (config,Nothing) -- force reload
+      )
     }
 

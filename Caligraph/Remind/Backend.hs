@@ -8,13 +8,14 @@ import Caligraph.Utils
 import Data.Either
 import Data.Maybe
 import Control.Monad.Identity
+import Control.Monad.Reader
 import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
 import Data.Time.Calendar (Day,addDays,diffDays,fromGregorian,gregorianMonthLength)
 
 import Data.Hashable
 
-data Config = Config String
+data Config = Config FilePath
 type ItemID = (String,Int) -- filepath, linenumber
 type St = (Config, Maybe [CB.Item ItemID])
 
@@ -153,6 +154,11 @@ load (Config path) = do
     isRem (i,Rem r) = Just (i,r)
     isRem _ = Nothing
 
+reminderTemplate :: CB.PartialReminder -> Reader Config (FilePath, String)
+reminderTemplate prem = do
+    Config path <- ask
+    return $ (,) path $ "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem
+
 backend :: CB.Backend ItemID St
-backend = CB.static_backend parseConfig load id
+backend = CB.static_backend parseConfig load id reminderTemplate
 

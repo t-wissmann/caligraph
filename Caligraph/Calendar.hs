@@ -89,4 +89,8 @@ editExternally ptr = doCalendar $ do
     be <- use calBackend
     zoom calState $ CB.editExternally be identifier
 
+addReminder :: CB.PartialReminder -> StateT Calendar IO ()
+addReminder pr = doCalendar $ do
+    be <- use calBackend
+    zoom calState $ CB.addReminder be pr
 

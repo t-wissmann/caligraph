@@ -12,6 +12,7 @@ import Control.Monad.Identity
 import Data.Functor.Contravariant (Op(Op,getOp))
 import Data.Maybe
 import Data.Time.Calendar (Day,fromGregorianValid)
+import Data.List
 
 data RFLine =
     Comment String
@@ -71,7 +72,22 @@ data PartialDate = PartialDate
   { pday  :: Maybe Int
   , pmonth :: Maybe Int
   , pyear :: Maybe Integer
-  } deriving (Eq,Show)
+  } deriving (Eq)
+
+month_names =
+  [ "Jan", "Feb", "Mar", "Apr", "May", "Jun"
+  , "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  ]
+
+instance Show (PartialDate) where
+    show pd =
+        concat
+        $ intersperse " "
+        $ mapMaybe id
+            [ fmap show $ pyear pd
+            , fmap (show . (!!) month_names) (pmonth pd)
+            , fmap show $ pday pd
+            ]
 
 flatPartialDate :: Maybe PartialDate -> PartialDate
 flatPartialDate = maybe (PartialDate Nothing Nothing Nothing) id
