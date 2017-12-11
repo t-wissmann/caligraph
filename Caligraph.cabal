@@ -33,6 +33,7 @@ library
     Caligraph.Cli.DayGrid
     Caligraph.Cli.DayWidget
     Caligraph.Cli.Types
+    Caligraph.Cli.AppState
     Caligraph.Cli.UnicodeJunction
     Caligraph.Config.Main
     Caligraph.Config.Calendars

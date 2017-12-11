@@ -1,10 +1,11 @@
-
 module Caligraph.Cli.Types where
 
 import Brick
 import Data.Time.Calendar
 
 data Dir = DirUp | DirDown | DirLeft  | DirRight deriving (Eq,Show)
+
+data CliMode = CMNormal | CMInsert
 
 data WidgetName =
     WNDayGrid

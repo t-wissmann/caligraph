@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Caligraph.Cli.Main where
@@ -12,6 +11,7 @@ import Brick.Widgets.Border.Style
 
 import Caligraph.Cli.Types
 import qualified Caligraph.Cli.DayGrid as DayGrid
+import Caligraph.Cli.AppState
 import qualified Caligraph.Cli.DayWidget as DayWidget
 
 import Caligraph.Utils
@@ -39,18 +39,9 @@ import System.Exit
 import System.Environment (getArgs)
 
 import Lens.Micro
-import Lens.Micro.TH
 import Lens.Micro.Mtl
 
-data St = St
-    { _dayGrid :: DayGrid.St WidgetName
-    , _visibleIncarnations :: Array Day [CB.Incarnation']
-    , _focusItem :: Maybe Int -- the item focused within a day, Nothing means 'the last'
-    , _calendar :: CC.Calendar
-    }
-
-makeLenses ''St
-
+type St =  Caligraph.Cli.AppState.AppState
 
 binds :: Map.Map ([Modifier],Key) (St -> EventM WidgetName (Next St))
 binds = Map.fromList
@@ -266,7 +257,7 @@ testmain = do
         Nothing -> return cal
         Just io_action -> io_action
   customMain buildVty Nothing mainApp
-    (St
+    (AppState
         (DayGrid.init WNDayGrid today)
         (array (today,addDays (-1) today) [])
         (Just 0)

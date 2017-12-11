@@ -5,7 +5,7 @@ import Control.Monad.State.Lazy (State)
 import qualified Control.Monad.State.Lazy as S
 import Data.List
 
--- | a computation of res that may suspend by asking a qeustion of type 'param'
+-- | a computation of res that may suspend by asking a question of type 'param'
 -- waiting for an answer of type 'ri'
 data LazyResult param ri res
     = Result res
