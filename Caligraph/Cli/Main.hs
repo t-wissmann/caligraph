@@ -79,8 +79,7 @@ quit_cmd =
 focus_cmd :: Dir -> Cmd St
 focus_cmd dir = do
     focus <- use $ dayGrid . DayGrid.focusDay
-    visibInc <- use visibleIncarnations
-    let reminders = (fromMaybe [] $ safeArray visibInc focus)
+    reminders <- getReminders focus
     fi <- use focusItem
     let focusItemConcrete = case fi of
                             Nothing -> length reminders - 1
@@ -109,8 +108,7 @@ focus_cmd dir = do
 edit_externally_cmd :: Cmd St
 edit_externally_cmd = do
     day <- use (dayGrid . DayGrid.focusDay)
-    incs <- use visibleIncarnations
-    let rems = (fromMaybe [] $ safeArray incs day)
+    rems <- getReminders day
     idx <- fmap (fromMaybe $ length rems - 1) $ use focusItem
     if idx >= 0 && idx < length rems
     then do
@@ -133,9 +131,18 @@ dequeueIO = do
             c' <- liftIO $ io_action
             calendar .= c'
             updateDayRange' True
+            -- fix focusItem
+            day <- use $ dayGrid . DayGrid.focusDay
+            reminders <- getReminders day
+            focusItem %= fmap (min $ length reminders - 1)
 
 ui st =
   [DayGrid.render $ st^.dayGrid]
+
+getReminders :: Monad m => Day -> StateT St m [CB.Incarnation']
+getReminders day = do
+    visibInc <- use visibleIncarnations
+    return $ fromMaybe [] $ safeArray visibInc day
 
 tryEnableMouse :: EventM WidgetName ()
 tryEnableMouse = do
