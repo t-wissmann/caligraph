@@ -77,7 +77,7 @@ binds :: Map.Map ([Modifier],Key) (Either (St -> EventM WidgetName (Next St)) (C
 binds = Map.fromList
   [ (([], KEsc), Right quit_cmd)
   , (([], KChar 'q'), Right quit_cmd)
-  , (([], KChar 'e'), Left edit_externally_cmd)
+  , (([], KChar 'e'), Right edit_externally_cmd)
   , (([], KChar 'a'), Left add_reminder_cmd)
   , (([], KChar 'o'), Left $ c $ DayGrid.gotoToday)
 
@@ -133,22 +133,17 @@ focus_cmd dir = do
                 then Right $ focusItemConcrete + 1
                 else Left (Just 0)
 
-edit_externally_cmd :: St -> EventM WidgetName (Next St)
-edit_externally_cmd st =
-    suspendAndResume $ execStateT io_action st
-    where
-        io_action :: StateT St IO ()
-        io_action = do
-            day <- use (dayGrid . DayGrid.focusDay)
-            incs <- use visibleIncarnations
-            let rems = (fromMaybe [] $ safeArray incs day)
-            idx <- fmap (fromMaybe $ length rems - 1) $ use focusItem
-            if idx >= 0 && idx < length rems
-            then do
-                let p = CB.itemId $ rems !! idx
-                zoom calendar $ CC.editExternally p
-                dequeueIO
-            else return ()
+edit_externally_cmd :: Cmd St
+edit_externally_cmd = do
+    day <- use (dayGrid . DayGrid.focusDay)
+    incs <- use visibleIncarnations
+    let rems = (fromMaybe [] $ safeArray incs day)
+    idx <- fmap (fromMaybe $ length rems - 1) $ use focusItem
+    if idx >= 0 && idx < length rems
+    then do
+        let p = CB.itemId $ rems !! idx
+        zoom calendar $ CC.editExternally p
+    else return ()
 
 add_reminder_cmd :: St -> EventM WidgetName (Next St)
 add_reminder_cmd st =
@@ -161,13 +156,13 @@ add_reminder_cmd st =
             zoom calendar $ CC.addReminder $ CB.PartialReminder day title Nothing Nothing Nothing
             dequeueIO
 
-dequeueIO :: StateT St IO ()
+dequeueIO :: MonadIO io => StateT St io ()
 dequeueIO = do
     c <- use calendar
     case CC.dequeueIO c of
         Nothing -> return ()
         Just io_action -> do
-            c' <- lift $ io_action
+            c' <- liftIO $ io_action
             calendar .= c'
             updateDayRange' True
 
@@ -225,12 +220,11 @@ myHandleEvent s (VtyEvent e) =
       case Map.lookup (mods,key) binds of
         Just (Left cb) -> fmap (fmap updateDayRange) (cb s)
         Just (Right cmd) ->
-            case (runStateT cmd s) of
+            case runStateT (do cmd ; dequeueIO) s of
                 Pure ((), s') ->
                     continueOrHalt $ updateDayRange s'
-                Monadic io_action -> do
-                    ((), s') <- liftIO $ io_action
-                    continueOrHalt $ updateDayRange s'
+                Monadic io_action ->
+                    fmap (fmap $ updateDayRange . snd) $ suspendAndResume io_action
         Nothing -> continue (updateDayRange s)
     EvResize w h ->
       continue (s & dayGrid %~ DayGrid.resize (w,h) & updateDayRange)

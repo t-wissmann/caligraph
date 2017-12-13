@@ -81,13 +81,13 @@ dequeueIO (Calendar (RawCalendar st be istore)) = do
         st' <- io_action
         return $ Calendar $ RawCalendar st' be istore
 
-editExternally :: PS.Ptr -> StateT Calendar IO ()
+editExternally :: MonadIO io => PS.Ptr -> StateT Calendar io ()
 editExternally ptr = doCalendar $ do
     identifier <- zoom idStore $ PS.resolve ptr
     -- st <- get
     -- be <- return (st^.calBackend)
     be <- use calBackend
-    zoom calState $ CB.editExternally be identifier
+    zoom calState $ mapStateT liftIO $ CB.editExternally be identifier
 
 addReminder :: CB.PartialReminder -> StateT Calendar IO ()
 addReminder pr = doCalendar $ do
