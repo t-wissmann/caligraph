@@ -46,31 +46,30 @@ type St =  Caligraph.Cli.AppState.AppState
 
 type Cmd st = StateT st (Possibly IO) ()
 
-binds :: Map.Map ([Modifier],Key) (Either (St -> EventM WidgetName (Next St)) (Cmd St))
+binds :: Map.Map ([Modifier],Key) (Cmd St)
 binds = Map.fromList
-  [ (([], KEsc), Right quit_cmd)
-  , (([], KChar 'q'), Right quit_cmd)
-  , (([], KChar 'e'), Right edit_externally_cmd)
-  , (([], KChar 'a'), Right add_reminder_cmd)
-  , (([], KChar 'o'), Right $ dayGrid %= DayGrid.gotoToday)
+  [ (([], KEsc), quit_cmd)
+  , (([], KChar 'q'), quit_cmd)
+  , (([], KChar 'e'), edit_externally_cmd)
+  , (([], KChar 'a'), add_reminder_cmd)
+  , (([], KChar 'o'), dayGrid %= DayGrid.gotoToday)
 
-  , (([MCtrl], KChar 'd'), Right $ dayGrid %= DayGrid.scrollPage 0.45)
-  , (([MCtrl], KChar 'u'), Right $ dayGrid %= DayGrid.scrollPage (-0.45))
-  , (([MCtrl], KChar 'f'), Right $ dayGrid %= DayGrid.scrollPage 0.90)
-  , (([MCtrl], KChar 'b'), Right $ dayGrid %= DayGrid.scrollPage (-0.90))
+  , (([MCtrl], KChar 'd'), dayGrid %= DayGrid.scrollPage 0.45)
+  , (([MCtrl], KChar 'u'), dayGrid %= DayGrid.scrollPage (-0.45))
+  , (([MCtrl], KChar 'f'), dayGrid %= DayGrid.scrollPage 0.90)
+  , (([MCtrl], KChar 'b'), dayGrid %= DayGrid.scrollPage (-0.90))
 
   -- hjkl
-  , (([], KChar 'h'), Right $ focus_cmd DirLeft)
-  , (([], KChar 'j'), Right $ focus_cmd DirDown)
-  , (([], KChar 'k'), Right $ focus_cmd DirUp)
-  , (([], KChar 'l'), Right $ focus_cmd DirRight)
+  , (([], KChar 'h'), focus_cmd DirLeft)
+  , (([], KChar 'j'), focus_cmd DirDown)
+  , (([], KChar 'k'), focus_cmd DirUp)
+  , (([], KChar 'l'), focus_cmd DirRight)
   -- arrow keys
-  , (([], KLeft ), Right $ focus_cmd DirLeft)
-  , (([], KDown ), Right $ focus_cmd DirDown)
-  , (([], KUp   ), Right $ focus_cmd DirUp)
-  , (([], KRight), Right $ focus_cmd DirRight)
+  , (([], KLeft ), focus_cmd DirLeft)
+  , (([], KDown ), focus_cmd DirDown)
+  , (([], KUp   ), focus_cmd DirUp)
+  , (([], KRight), focus_cmd DirRight)
   ]
-  where c f = (\st -> continue (st & dayGrid %~ f))
 
 quit_cmd :: Cmd St
 quit_cmd =
@@ -191,8 +190,7 @@ myHandleEvent s (VtyEvent e) =
   case e of
     EvKey key mods ->
       case Map.lookup (mods,key) binds of
-        Just (Left cb) -> fmap (fmap updateDayRange) (cb s)
-        Just (Right cmd) ->
+        Just cmd ->
             case runStateT (do cmd ; dequeueIO) s of
                 Pure ((), s') ->
                     continueOrHalt $ updateDayRange s'
