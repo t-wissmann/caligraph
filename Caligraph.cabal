@@ -17,6 +17,7 @@ library
   exposed-modules:
     Caligraph.Utils
     Caligraph.Lib
+    Caligraph.Possibly
     Caligraph.PointerStore
     Caligraph.Backend.Types
     Caligraph.Backend.Utils
