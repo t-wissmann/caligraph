@@ -90,7 +90,7 @@ focus_cmd dir = do
             focusItem .= idx
             dayGrid %= DayGrid.moveFocus dir
     where
-      -- reminderInDir :: ? -> ? -> Either (Maybe Int) Int
+      reminderInDir :: Int -> [CB.Incarnation'] -> Either (Maybe Int) Int
       reminderInDir focusItemConcrete reminders =
         case dir of
             DirLeft -> Left (Just 0)
