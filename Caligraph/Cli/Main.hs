@@ -65,54 +65,62 @@ instance Monad m => Monad (Possibly m) where
             Pure x -> return x
             Monadic x -> x
 
-data Cmd st = StateT st (Possibly IO ())
+instance MonadTrans Possibly where
+    lift = Monadic
 
-binds :: Map.Map ([Modifier],Key) (St -> EventM WidgetName (Next St))
+instance MonadIO m => MonadIO (Possibly m) where
+    liftIO = Monadic . liftIO
+
+type Cmd st = StateT st (Possibly IO) ()
+
+binds :: Map.Map ([Modifier],Key) (Either (St -> EventM WidgetName (Next St)) (Cmd St))
 binds = Map.fromList
-  [ (([], KEsc), halt)
-  , (([], KChar 'q'), halt)
-  , (([], KChar 'e'), edit_externally_cmd)
-  , (([], KChar 'a'), add_reminder_cmd)
-  , (([], KChar 'o'), c $ DayGrid.gotoToday)
+  [ (([], KEsc), Right quit_cmd)
+  , (([], KChar 'q'), Right quit_cmd)
+  , (([], KChar 'e'), Left edit_externally_cmd)
+  , (([], KChar 'a'), Left add_reminder_cmd)
+  , (([], KChar 'o'), Left $ c $ DayGrid.gotoToday)
 
-  , (([MCtrl], KChar 'd'), c $ DayGrid.scrollPage 0.45)
-  , (([MCtrl], KChar 'u'), c $ DayGrid.scrollPage (-0.45))
-  , (([MCtrl], KChar 'f'), c $ DayGrid.scrollPage 0.90)
-  , (([MCtrl], KChar 'b'), c $ DayGrid.scrollPage (-0.90))
+  , (([MCtrl], KChar 'd'), Left $ c $ DayGrid.scrollPage 0.45)
+  , (([MCtrl], KChar 'u'), Left $ c $ DayGrid.scrollPage (-0.45))
+  , (([MCtrl], KChar 'f'), Left $ c $ DayGrid.scrollPage 0.90)
+  , (([MCtrl], KChar 'b'), Left $ c $ DayGrid.scrollPage (-0.90))
 
   -- hjkl
-  , (([], KChar 'h'), focus_cmd DirLeft)
-  , (([], KChar 'j'), focus_cmd DirDown)
-  , (([], KChar 'k'), focus_cmd DirUp)
-  , (([], KChar 'l'), focus_cmd DirRight)
+  , (([], KChar 'h'), Right $ focus_cmd DirLeft)
+  , (([], KChar 'j'), Right $ focus_cmd DirDown)
+  , (([], KChar 'k'), Right $ focus_cmd DirUp)
+  , (([], KChar 'l'), Right $ focus_cmd DirRight)
   -- arrow keys
-  , (([], KLeft ), focus_cmd DirLeft)
-  , (([], KDown ), focus_cmd DirDown)
-  , (([], KUp   ), focus_cmd DirUp)
-  , (([], KRight), focus_cmd DirRight)
+  , (([], KLeft ), Right $ focus_cmd DirLeft)
+  , (([], KDown ), Right $ focus_cmd DirDown)
+  , (([], KUp   ), Right $ focus_cmd DirUp)
+  , (([], KRight), Right $ focus_cmd DirRight)
   ]
   where c f = (\st -> continue (st & dayGrid %~ f))
 
+quit_cmd :: Cmd St
+quit_cmd =
+    aboutToQuit .= True
 
-focus_cmd :: Dir -> St -> EventM WidgetName (Next St)
-focus_cmd dir st =
-    continue (
-        case reminderInDir of
-            Right idx ->
-                st & focusItem .~ Just idx
-            Left idx ->
-                st
-                & focusItem .~ idx
-                & dayGrid %~ DayGrid.moveFocus dir)
+focus_cmd :: Dir -> Cmd St
+focus_cmd dir = do
+    focus <- use $ dayGrid . DayGrid.focusDay
+    visibInc <- use visibleIncarnations
+    let reminders = (fromMaybe [] $ safeArray visibInc focus)
+    fi <- use focusItem
+    let focusItemConcrete = case fi of
+                            Nothing -> length reminders - 1
+                            Just idx -> idx
+    case reminderInDir focusItemConcrete reminders of
+        Right idx ->
+            focusItem .= Just idx
+        Left idx -> do
+            focusItem .= idx
+            dayGrid %= DayGrid.moveFocus dir
     where
-      focus = st^.dayGrid^.DayGrid.focusDay
-      reminders = (fromMaybe [] $ safeArray (st^.visibleIncarnations) focus)
-      focusItemConcrete =
-        case (st^.focusItem) of
-            Nothing -> length reminders - 1
-            Just idx -> idx
-      reminderInDir :: Either (Maybe Int) Int
-      reminderInDir =
+      -- reminderInDir :: ? -> ? -> Either (Maybe Int) Int
+      reminderInDir focusItemConcrete reminders =
         case dir of
             DirLeft -> Left (Just 0)
             DirRight -> Left (Just 0)
@@ -204,14 +212,25 @@ mainApp =
 
 scrollStep = 3
 
+continueOrHalt :: St -> EventM wn (Next St)
+continueOrHalt s =
+    if s^.aboutToQuit
+    then halt s
+    else continue s
+
 myHandleEvent :: St -> BrickEvent WidgetName () -> EventM WidgetName (Next St)
 myHandleEvent s (VtyEvent e) =
   case e of
-    EvKey KEsc mods ->
-      halt s
     EvKey key mods ->
       case Map.lookup (mods,key) binds of
-        Just cb -> fmap (fmap updateDayRange) (cb s)
+        Just (Left cb) -> fmap (fmap updateDayRange) (cb s)
+        Just (Right cmd) ->
+            case (runStateT cmd s) of
+                Pure ((), s') ->
+                    continueOrHalt $ updateDayRange s'
+                Monadic io_action -> do
+                    ((), s') <- liftIO $ io_action
+                    continueOrHalt $ updateDayRange s'
         Nothing -> continue (updateDayRange s)
     EvResize w h ->
       continue (s & dayGrid %~ DayGrid.resize (w,h) & updateDayRange)
@@ -282,6 +301,7 @@ testmain = do
         Just io_action -> io_action
   customMain buildVty Nothing mainApp
     (AppState
+        False
         (DayGrid.init WNDayGrid today)
         (array (today,addDays (-1) today) [])
         (Just 0)

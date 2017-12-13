@@ -15,7 +15,8 @@ import Lens.Micro.TH
 import Lens.Micro.Mtl
 
 data AppState = AppState
-    { _dayGrid :: DayGrid.St WidgetName
+    { _aboutToQuit :: Bool
+    , _dayGrid :: DayGrid.St WidgetName
     , _visibleIncarnations :: Array Day [CB.Incarnation']
     , _focusItem :: Maybe Int -- the item focused within a day, Nothing means 'the last'
     , _calendar :: Calendar.Calendar
