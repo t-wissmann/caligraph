@@ -2,25 +2,26 @@
 module Caligraph.RemindPipe.Backend where
 
 import Caligraph.RemindPipe.Types
+import Caligraph.RemindPipe.Parser (parseRemOutput)
 import qualified Caligraph.Backend.Types as CB
 
 import Control.Monad.State
 
+import Data.List
 import Data.Time.Calendar
 import Data.Ix (range)
 import qualified Data.Array as A
 import qualified Data.Map.Strict as M
 
 import System.FilePath
+import System.Process
 
+import Lens.Micro
 import Lens.Micro.Mtl
 import Lens.Micro.TH
 import Debug.Trace
 
 -- basically parse the output of  remind -r -s -l file month year
-
-type Month = (Integer,Int)
-type Identifier = (FilePath, Int)
 data St = St
     { _path :: String
     , _monthCache :: M.Map Month (CB.Incarnations Identifier)
@@ -54,6 +55,7 @@ getMonthIncarnations month = do
 
 query :: (Day,Day) -> State St (CB.Incarnations Identifier)
 query (from,to) = do
+    cm <- use monthCache
     monthsWithRems <- forM months_covered getMonthIncarnations
     return
         $ A.array (from,to)
@@ -76,11 +78,26 @@ parseConfig cfg =
         Just path -> return $ St path M.empty []
         Nothing -> Left "Mandatory setting 'path' missing"
 
+dequeueIO :: St -> Maybe (IO St)
+dequeueIO st =
+    if [] == (st^.cacheMisses)
+    then Nothing
+    else Just $ flip execStateT st $ do
+        cm <- fmap nub $ use cacheMisses
+        cacheMisses .= []
+        forM_ cm $ \month -> do
+            -- raw_output <- liftIO $ readCreateProcess (proc "rem" []) ""
+            -- days_in_month <- parseRemOutput raw_output
+            let days_in_month = []
+            monthCache %= M.insert month
+                (A.accumArray (flip (:)) [] (monthRange month) days_in_month)
+            return ()
+
 
 backend :: CB.Backend Identifier St
 backend = CB.Backend
   { CB.query = query
-  , CB.dequeueIO = const Nothing
+  , CB.dequeueIO = dequeueIO
   , CB.editExternally = (\i -> return ())
   , CB.addReminder = (\prem -> return ())
   , CB.create = parseConfig
