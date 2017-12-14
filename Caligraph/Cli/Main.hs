@@ -39,6 +39,8 @@ import qualified Data.Map.Strict as Map
 import System.Exit
 import System.Environment (getArgs)
 
+import Debug.Trace
+
 import Lens.Micro
 import Lens.Micro.Mtl
 
