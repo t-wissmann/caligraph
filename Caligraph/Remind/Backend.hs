@@ -157,7 +157,7 @@ load (Config path) = do
 reminderTemplate :: CB.PartialReminder -> Reader Config (FilePath, String)
 reminderTemplate prem = do
     Config path <- ask
-    return $ (,) path $ "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem
+    return $ (,) path $ "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem ++ "\n"
 
 backend :: CB.Backend ItemID St
 backend = CB.static_backend parseConfig load id reminderTemplate

@@ -22,9 +22,11 @@ import qualified Caligraph.Calendar as CC
 
 import Control.Monad (when)
 import Control.Monad.State
+import Control.Monad.Writer.Lazy
 import Control.Monad.IO.Class (liftIO)
 import Data.Array
 import Data.Maybe
+import Data.Semigroup
 import Data.Functor.Identity
 import qualified Caligraph.Cli.UnicodeJunction as UJ
 
@@ -46,7 +48,69 @@ import Lens.Micro.Mtl
 
 type St =  Caligraph.Cli.AppState.AppState
 
-type Cmd st = StateT st (Possibly IO) ()
+data CmdOutput = CmdOutput
+    { cmdoutStderr :: [String]
+    , cmdoutSuspendGui :: Max Bool
+    }
+
+instance Monoid CmdOutput where
+    mempty = CmdOutput mempty mempty
+    mappend (CmdOutput a1 a2) (CmdOutput b1 b2) =
+        CmdOutput (mappend a1 b1) (mappend a2 b2)
+
+
+data FgIO a = NoFg a | WithFg (IO a)
+data BgFgIO a = BgFgIO (IO (FgIO a))
+
+data Breakpoint m a = Breakpoint {
+    projBreakpoint :: (m (Possibly m a))
+  }
+
+discardBreakpoint :: Monad m => Breakpoint m a -> m a
+discardBreakpoint (Breakpoint mx) = do
+    x <- mx
+    case x of
+        Pure y -> return y
+        Monadic my -> my
+
+instance Functor m => Functor (Breakpoint m) where
+    fmap f (Breakpoint mx) = Breakpoint (fmap (fmap f) mx)
+
+instance Applicative m => Applicative (Breakpoint m) where
+    pure = Breakpoint . pure . pure
+    Breakpoint f <*> Breakpoint x = Breakpoint (t2 f x)
+        where
+          t2 :: (Applicative f2, Applicative f1) => f1 (f2 (a -> b)) -> f1 (f2 a) -> f1 (f2 b)
+          t2 = (<*>) . ((<*>) (pure (<*>)))
+
+instance Monad m => Monad (Breakpoint m) where
+    (Breakpoint mx) >>= f = Breakpoint $ do
+        -- do in the monad m
+        possibly_mx <- mx
+        case possibly_mx of
+            Pure x -> projBreakpoint (f x)
+            Monadic mx' ->
+                return $ Monadic $ do
+                    x <- mx'
+                    discardBreakpoint (f x)
+
+instance MonadTrans Breakpoint where
+    lift action = Breakpoint (fmap return action)
+
+instance MonadIO m => MonadIO (Breakpoint m) where
+    liftIO io_action = Breakpoint (fmap return $ liftIO io_action)
+
+breakMonad :: Monad m => Breakpoint m ()
+breakMonad = Breakpoint $ return $ Monadic $ return ()
+
+--instance Monad BgFgIO where
+--  return = BgFgIO
+--  (B
+
+
+type Cmd st = StateT st (Breakpoint IO) ()
+
+requestSuspendGui = lift breakMonad
 
 binds :: Map.Map ([Modifier],Key) (Cmd St)
 binds = Map.fromList
@@ -114,6 +178,7 @@ edit_externally_cmd = do
     if idx >= 0 && idx < length rems
     then do
         let p = CB.itemId $ rems !! idx
+        requestSuspendGui
         zoom calendar $ CC.editExternally p
     else return ()
 
@@ -193,11 +258,15 @@ myHandleEvent s (VtyEvent e) =
     EvKey key mods ->
       case Map.lookup (mods,key) binds of
         Just cmd ->
-            case runStateT (do cmd ; dequeueIO) s of
-                Pure ((), s') ->
-                    continueOrHalt $ updateDayRange s'
-                Monadic io_action ->
-                    fmap (fmap $ updateDayRange . snd) $ suspendAndResume io_action
+            let Breakpoint io_action = runStateT (do cmd ; dequeueIO) s in
+            do
+                possibly_io <- liftIO $ io_action
+                case possibly_io of
+                    Pure ((),s') ->
+                        continueOrHalt (updateDayRange s')
+                    Monadic fg_io_action ->
+                        suspendAndResume $
+                            fmap (updateDayRange . snd) fg_io_action
         Nothing -> continue (updateDayRange s)
     EvResize w h ->
       continue (s & dayGrid %~ DayGrid.resize (w,h) & updateDayRange)
