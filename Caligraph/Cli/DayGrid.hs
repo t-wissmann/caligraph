@@ -20,8 +20,9 @@ import Brick.AttrMap (attrMap, AttrMap)
 import Brick.Widgets.Border.Style
 
 import Data.Time.Calendar (Day,addDays,diffDays)
-import Data.Time.Clock (getCurrentTime, utctDay)
+import Data.Time.Clock (getCurrentTime)
 import Data.Time.Calendar.WeekDate (toWeekDate)
+import Data.Time.LocalTime (utcToLocalTime, getCurrentTimeZone,localDay)
 
 import qualified Data.List as L
 import qualified Data.Map.Strict as M
@@ -119,10 +120,11 @@ init n d =
   St n 0 d d d Nothing (const emptyDay) M.empty weekPerRow
 
 getToday :: IO Day
-      -- ^ today
+      -- ^ today in the current time zone
 getToday = do
   g <- getCurrentTime
-  return $ utctDay g
+  tz <- getCurrentTimeZone
+  return $ localDay $ utcToLocalTime tz g
 
 -- | render the calendar
 render :: (Ord n, Show n)
