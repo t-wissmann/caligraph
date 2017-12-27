@@ -13,8 +13,6 @@ import Control.Monad.Reader (Reader,withReader,ReaderT,runReaderT)
 import Data.Functor.Identity
 
 import System.FilePath
-import System.Environment
-import System.Process
 
 import Text.Printf
 import Data.Ord
@@ -87,8 +85,7 @@ static_backend configparser initializer item2file remTemplate = Backend
     , create = fmap (flip (,) Nothing) . configparser
     , editExternally = (\i ->
             let (file,line) = item2file i in do
-            editor <- fmap (fromMaybe "vi") $ lift $ lookupEnv "EDITOR"
-            lift $ callProcess editor ["+" ++ show line, file]
+            lift $ editFileExternally file line
             st <- gets fst
             put (st, Nothing) -- discard items to force reload
         )

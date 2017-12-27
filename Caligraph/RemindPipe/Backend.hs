@@ -5,7 +5,7 @@ import Caligraph.RemindPipe.Types
 import Caligraph.RemindPipe.Parser (parseRemOutput)
 import qualified Caligraph.Backend.Types as CB
 import Caligraph.Remind.Types (month_names)
-import Caligraph.Utils (expandTilde)
+import Caligraph.Utils (expandTilde,editFileExternally)
 
 import Control.Monad.State
 
@@ -94,7 +94,7 @@ dequeueIO st =
             let rem = "remind"
             let rem_args = ["-r", "-s", "-l", filepath, mon_name, show y]
             raw_output <- liftIO $ readProcess rem rem_args ""
-            let days_in_month = parseRemOutput $! traceShowId raw_output
+            let days_in_month = parseRemOutput raw_output
             -- let days_in_month = []
             monthCache %= M.insert (y,month)
                 (A.accumArray (flip (:)) [] (monthRange (y,month)) days_in_month)
@@ -105,7 +105,9 @@ backend :: CB.Backend Identifier St
 backend = CB.Backend
   { CB.query = query
   , CB.dequeueIO = dequeueIO
-  , CB.editExternally = (\i -> return ())
+  , CB.editExternally = (\(filepath,line) -> do
+        lift $ editFileExternally filepath line
+    )
   , CB.addReminder = (\prem -> return ())
   , CB.create = parseConfig
   }

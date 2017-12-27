@@ -24,8 +24,17 @@ parseRemOutput buffer = rights $ map parseIncarnation $ pair $ Split.endBy "\n" 
     pair (_:[]) = []
 
 parseIncarnation :: (String,String) -> Either String (Day,CB.Incarnation Identifier)
-parseIncarnation (metadata,fields) =
-    mapLeft show $ P.parse (main_fields ("",0)) "remind output" fields
+parseIncarnation (metadata_line,fields) = mapLeft show $ do
+    ident <- P.parse meta_data "remind output" metadata_line
+    P.parse (main_fields ident) "remind output" fields
+
+meta_data :: GenParser Char st Identifier
+meta_data = do
+    string "# fileinfo "
+    line <- parseNum
+    char ' '
+    filepath <- many1 (noneOf "\n")
+    return (filepath,line)
 
 main_fields :: ident -> GenParser Char st (Day,CB.Incarnation ident)
 main_fields identifier = do

@@ -3,7 +3,10 @@ module Caligraph.Utils where
 import System.Directory (getHomeDirectory)
 import System.FilePath (joinPath)
 
+import System.Environment
+import System.Process
 import Data.Array as A
+import Data.Maybe
 
 lastSafe :: [a] -> Maybe a
 lastSafe = f Nothing
@@ -27,3 +30,10 @@ expandTilde s =
         home <- getHomeDirectory
         return $ joinPath [home, tl]
      x -> return x
+
+editFileExternally :: FilePath -> Int -> IO ()
+editFileExternally filepath line = do
+    editor <- fmap (fromMaybe "vi") $ lookupEnv "EDITOR"
+    callProcess editor ["+" ++ show line, filepath]
+    return ()
+
