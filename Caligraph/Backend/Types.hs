@@ -17,7 +17,7 @@ data Incarnation i = Incarnation
   , title :: String
   -- , TODO: a timezone
   , itemId :: i
-  } deriving (Eq)
+  } deriving (Eq,Show)
 
 instance Functor Incarnation where
     fmap f x = x { itemId = f $ itemId x }

@@ -456,7 +456,7 @@ rangeVisible st =
     let
       height =
         case (st^.size) of
-          Nothing -> 1000
+          Nothing -> 100
           Just (_,h) -> h
       daysVisible = fromIntegral $
         (st^.rowController.columns)

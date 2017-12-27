@@ -4,6 +4,8 @@ module Caligraph.RemindPipe.Backend where
 import Caligraph.RemindPipe.Types
 import Caligraph.RemindPipe.Parser (parseRemOutput)
 import qualified Caligraph.Backend.Types as CB
+import Caligraph.Remind.Types (month_names)
+import Caligraph.Utils (expandTilde)
 
 import Control.Monad.State
 
@@ -23,7 +25,7 @@ import Debug.Trace
 
 -- basically parse the output of  remind -r -s -l file month year
 data St = St
-    { _path :: String
+    { _path :: String -- a filepath with tilde not yet expanded
     , _monthCache :: M.Map Month (CB.Incarnations Identifier)
     , _cacheMisses :: [Month]
     -- ^ mapping a month to the full array for all days of that month
@@ -84,13 +86,18 @@ dequeueIO st =
     then Nothing
     else Just $ flip execStateT st $ do
         cm <- fmap nub $ use cacheMisses
+        filepath' <- use path
+        filepath <- liftIO $ expandTilde filepath'
         cacheMisses .= []
-        forM_ cm $ \month -> do
-            -- raw_output <- liftIO $ readCreateProcess (proc "rem" []) ""
-            -- days_in_month <- parseRemOutput raw_output
-            let days_in_month = []
-            monthCache %= M.insert month
-                (A.accumArray (flip (:)) [] (monthRange month) days_in_month)
+        forM_ cm $ \(y,month) -> do
+            let mon_name = month_names !! (month-1)
+            let rem = "remind"
+            let rem_args = ["-r", "-s", "-l", filepath, mon_name, show y]
+            raw_output <- liftIO $ readProcess rem rem_args ""
+            let days_in_month = parseRemOutput $! traceShowId raw_output
+            -- let days_in_month = []
+            monthCache %= M.insert (y,month)
+                (A.accumArray (flip (:)) [] (monthRange (y,month)) days_in_month)
             return ()
 
 
