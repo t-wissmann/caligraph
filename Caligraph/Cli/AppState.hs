@@ -20,6 +20,7 @@ data AppState = AppState
     , _visibleIncarnations :: Array Day [CB.Incarnation']
     , _focusItem :: Maybe Int -- the item focused within a day, Nothing means 'the last'
     , _calendar :: Calendar.Calendar
+    , _messages :: [LogLine]
     }
 
 makeLenses ''AppState

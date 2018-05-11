@@ -20,6 +20,8 @@ type DayWidget n
     -> (Int,Widget n)
     -- ^ the widget and its height
 
+type LogLine = String
+
 emptyDay :: DayWidget n
 emptyDay _ = (1, str "loading...")
 

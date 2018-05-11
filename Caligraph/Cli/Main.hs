@@ -8,6 +8,7 @@ import Brick.Main
 import Brick.Widgets.Core (withAttr,vBox,(<+>))
 import Brick.AttrMap (attrMap, AttrMap)
 import Brick.Widgets.Border.Style
+import qualified Brick.Types as BT
 
 import Caligraph.Cli.Types
 import qualified Caligraph.Cli.DayGrid as DayGrid
@@ -203,7 +204,12 @@ dequeueIO = do
             focusItem %= fmap (min $ length reminders - 1)
 
 ui st =
-  [DayGrid.render $ st^.dayGrid]
+  [DayGrid.render (st^.dayGrid) <=> footer]
+  where
+    footer = withAttr "statusline"
+        $ vBox
+        $ map (padRight BT.Max . str)
+        $ reverse $ take 5 (st^.messages)
 
 getReminders :: Monad m => Day -> StateT St m [CB.Incarnation']
 getReminders day = do
@@ -237,6 +243,7 @@ mainApp =
         , ("cellHeaderFocus", yellow `on` black)
         , ("cellHeaderToday", black `on` yellow)
         , ("cellHeaderFocusToday", black `on` yellow)
+        , ("statusline", blue `on` black)
         , ("reminderTitle", defAttr)
         , ("reminderTime", Attr (SetTo bold) (SetTo green) KeepCurrent)
         , ("selectedReminderTitle", bg black)
@@ -341,7 +348,8 @@ testmain = do
         (DayGrid.init WNDayGrid today)
         (array (today,addDays (-1) today) [])
         (Just 0)
-        cal_loaded)
+        cal_loaded
+        ["Caligraph started"])
   return ()
 
 rightOrDie :: Either String a -> IO a
