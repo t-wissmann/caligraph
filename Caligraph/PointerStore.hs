@@ -18,7 +18,7 @@ import Lens.Micro
 import Lens.Micro.TH
 import Lens.Micro.Mtl
 
-data Ptr = Ptr Int
+data Ptr = Ptr Int deriving (Eq,Ord)
 
 --- (PointerStore a) makes it easy to enumerate values of type a to assign them
 -- running integers.

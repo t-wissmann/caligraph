@@ -32,7 +32,7 @@ type Incarnation' = Incarnation Ptr
 
 instance Ord i => Ord (Incarnation i) where
   compare i1 i2 =
-    either id (const EQ) $ do
+    either id (\() -> EQ) $ do
       -- sorting is basically lexicographic
       compare_on day i1 i2
       -- but we want Just x to be smaller than Nothing

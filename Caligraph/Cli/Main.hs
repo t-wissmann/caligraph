@@ -27,6 +27,7 @@ import Control.Monad.Writer.Lazy
 import Control.Monad.IO.Class (liftIO)
 import Data.Array
 import Data.Maybe
+import qualified Data.List as L
 import Data.Semigroup
 import Data.Functor.Identity
 import qualified Caligraph.Cli.UnicodeJunction as UJ
@@ -308,7 +309,7 @@ day2widget st day =
     where
       today = st^.dayGrid^.DayGrid.today
       focus = st^.dayGrid^.DayGrid.focusDay
-      reminders = (fromMaybe [] $ safeArray (st^.visibleIncarnations) day)
+      reminders = L.sort (fromMaybe [] $ safeArray (st^.visibleIncarnations) day)
 
 updateDayRange :: St -> St
 updateDayRange = execState $ updateDayRange' False
