@@ -11,6 +11,8 @@ import Control.Monad.State
 
 import Data.List
 import Data.Time.Calendar
+import Data.Time.Clock (getCurrentTime)
+import Data.Time.LocalTime (utcToLocalTime, getCurrentTimeZone,localDay)
 import Data.Ix (range)
 import qualified Data.Array as A
 import qualified Data.Map.Strict as M
@@ -29,6 +31,8 @@ data St = St
     , _monthCache :: M.Map Month (CB.Incarnations Identifier)
     , _cacheMisses :: [Month]
     -- ^ mapping a month to the full array for all days of that month
+    , _firstRun :: Bool
+    -- ^ if the config has just been created
     }
 
 makeLenses ''St
@@ -36,6 +40,11 @@ makeLenses ''St
 nextMonth :: Month -> Month
 nextMonth (year,m) =
     (year + (fromIntegral m) `div` 12, 1 + (m `mod` 12))
+
+previousMonth :: Month -> Month
+previousMonth (year,m) =
+    if m == 1 then (year - 1, 12)
+    else (year, m - 1)
 
 -- get the first and the last day of the given month
 monthRange :: Month -> (Day,Day)
@@ -77,11 +86,27 @@ query (from,to) = do
 parseConfig :: (String -> Maybe String) -> Either String St
 parseConfig cfg =
     case (cfg "path") of
-        Just path -> return $ St path M.empty []
+        Just path -> return $ St path M.empty [] True
         Nothing -> Left "Mandatory setting 'path' missing"
 
-dequeueIO :: St -> Maybe (IO St)
-dequeueIO st =
+dequeueIO_firstRun :: St -> Maybe (IO St)
+dequeueIO_firstRun st =
+        if (st^.firstRun)
+        then Just $ do
+          g <- getCurrentTime
+          tz <- getCurrentTimeZone
+          let month = ((\(y,m,_) -> (y,m)) $ toGregorian
+                            $ localDay $ utcToLocalTime tz g)
+          let st' = st { _firstRun = False
+                    , _cacheMisses = [previousMonth month, month, nextMonth month] }
+          case dequeueIO_normal st' of
+            Just some_action -> some_action
+            Nothing -> return st'
+        else
+            dequeueIO_normal st
+
+dequeueIO_normal :: St -> Maybe (IO St)
+dequeueIO_normal st =
     if [] == (st^.cacheMisses)
     then Nothing
     else Just $ flip execStateT st $ do
@@ -104,7 +129,7 @@ dequeueIO st =
 backend :: CB.Backend Identifier St
 backend = CB.Backend
   { CB.query = query
-  , CB.dequeueIO = dequeueIO
+  , CB.dequeueIO = dequeueIO_firstRun
   , CB.editExternally = (\(filepath,line) -> do
         lift $ editFileExternally filepath line
     )
