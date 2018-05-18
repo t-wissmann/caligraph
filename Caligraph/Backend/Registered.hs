@@ -15,7 +15,7 @@ data SomeBackend = forall identType backendState.
 
 backends :: [(String, SomeBackend)]
 backends =
-    [ b "remindSimple"        Caligraph.Remind.Backend.backend
+    [ b "remindSimple"  Caligraph.Remind.Backend.backend
     , b "remindPipe"    Caligraph.RemindPipe.Backend.backend
     ]
     where b x y = (x, SomeBackend y)
