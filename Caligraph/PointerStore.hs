@@ -4,7 +4,8 @@ module Caligraph.PointerStore (
     Ptr,
     PointerStore,
     empty,
-    lookup,
+    lookupUnsafe,
+    lookupOrInsert,
     resolve,
 ) where
 
@@ -36,8 +37,8 @@ empty = PointerStore M.empty M.empty 1024
 
 -- If the given 'a' is in the PointerStore, return its index,
 -- otherwise insert it and assign it the next free Int
-lookup :: Monad m => (Eq a, Hashable a) => a -> StateT (PointerStore a) m Ptr
-lookup a = do
+lookupOrInsert :: Monad m => (Eq a, Hashable a) => a -> StateT (PointerStore a) m Ptr
+lookupOrInsert a = do
     p2d <- use data2ptr
     case M.lookup a p2d of
         Just i ->
@@ -48,6 +49,12 @@ lookup a = do
             data2ptr %= M.insert a p
             ptr2data %= M.insert p a
             return $ Ptr p
+
+lookupUnsafe :: (Eq a, Hashable a) => PointerStore a -> a -> Ptr
+lookupUnsafe ps a =
+    case M.lookup a (_data2ptr ps) of
+        Just p -> Ptr p
+        Nothing -> error $ "Invalid item id"
 
 resolve :: Monad m => Ptr -> StateT (PointerStore a) m a
 resolve (Ptr p) = do

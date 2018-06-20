@@ -87,11 +87,20 @@ data XBackendQuery a = XBackendQuery {
 
 type XBackendM state query a = StateT state (Writer [XBackendQuery query]) a
 
+-- | tell where the source code of an item can be edited
+data ItemSource event =
+      ExistingFile (FilePath, Int) event
+      -- ^ in a specific line of an existing file, together with an event
+      --   that is triggered when the user finished editing
+      -- | Source Text (Text -> queryType)
+      -- ^ the source is provided, together with an event that updates the item
+
 data XBackend state itemid query = XBackend
-  { cachedIncarnations :: state -> (Day,Day) -> (Incarnations itemid)
+  { cachedIncarnations :: state -> (Day,Day) -> (Incarnations')
   , setRangeVisible :: (Day,Day) -> XBackendM state query ()
   , xcreate :: (String -> Maybe String) -> Either String state
   , handleResponse :: query -> XBackendM state query ()
   , xaddReminder :: PartialReminder -> XBackendM state query ()
+  , itemSource :: Ptr -> XBackendM state query (ItemSource query)
   }
 

@@ -314,9 +314,6 @@ day2widget st day =
 updateDayRange :: St -> St
 updateDayRange = execState $ updateDayRange' False
 
-embed :: Monad m => State s r -> StateT s m r
-embed = mapStateT (return . runIdentity)
-
 updateDayRange' :: Monad m => Bool -> StateT St m ()
 updateDayRange' force = do
     -- get currently visible day range

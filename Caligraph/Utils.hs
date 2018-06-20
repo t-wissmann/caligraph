@@ -8,6 +8,9 @@ import System.Process
 import Data.Array as A
 import Data.Maybe
 
+import Control.Monad.State
+import Control.Monad.Identity
+
 lastSafe :: [a] -> Maybe a
 lastSafe = f Nothing
   where f :: Maybe a -> [a] -> Maybe a
@@ -36,4 +39,7 @@ editFileExternally filepath line = do
     editor <- fmap (fromMaybe "vi") $ lookupEnv "EDITOR"
     callProcess editor ["+" ++ show line, filepath]
     return ()
+
+embed :: Monad m => State s r -> StateT s m r
+embed = mapStateT (return . runIdentity)
 

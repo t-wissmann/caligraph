@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 
 module Caligraph.Remind.Backend where
 
@@ -14,14 +15,27 @@ import Control.Monad.Writer
 import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
 import Data.Time.Calendar (Day,addDays,diffDays,fromGregorian,gregorianMonthLength)
+import qualified Caligraph.PointerStore as P
+
+import Lens.Micro
+import Lens.Micro.TH
+import Lens.Micro.Mtl
 
 import Data.Hashable
 
 type Config = FilePath
 type ItemID = (String,Int) -- filepath, linenumber
-type St = (Config, Maybe [CB.Item ItemID])
+data St = St
+    { stConfig :: Config
+    , stItems :: Maybe [CB.Item ItemID]
+    , _stIdStore :: P.PointerStore ItemID
+    }
+
+makeLenses ''St
+
 data Event =
       FileContent [CB.Item ItemID]
+    | ForceReload
 
 algorithm :: itemid -> REM -> CB.Item itemid
 algorithm itemid (REM args msg) =
@@ -158,29 +172,45 @@ load path = do
     isRem (i,Rem r) = Just (i,r)
     isRem _ = Nothing
 
+rebuildPtrStore :: (Eq i, Hashable i) => [CB.Item i] -> P.PointerStore i
+rebuildPtrStore items =
+    execState (mapM (P.lookupOrInsert . CB.identifier) items) P.empty
+
 reminderTemplate :: CB.PartialReminder -> CB.XBackendM St Event String
 reminderTemplate prem =
     return $ "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem ++ "\n"
 
 backend :: CB.XBackend St ItemID Event
 backend = CB.XBackend
-    { CB.cachedIncarnations = (\st -> CB.query_items (fromMaybe [] $ snd st))
+    { CB.cachedIncarnations = (\st ->
+        fmap (fmap $ fmap $ fmap $ P.lookupUnsafe $ _stIdStore st)
+        $ CB.query_items (fromMaybe [] (stItems st)))
     , CB.setRangeVisible = (\range -> do
-        (config,items) <- get
+        config <- gets stConfig
+        items <- gets stItems
         case items of
             Just _ -> return ()
             Nothing -> tell $ (:[]) $ CB.XBackendQuery $ fmap FileContent $ load config)
-    , CB.xcreate = fmap (flip (,) Nothing) . parseConfig
+    , CB.xcreate = (\vals -> do
+        conf <- parseConfig vals
+        return $ St conf Nothing P.empty)
     , CB.handleResponse = (\q -> case q of
+        ForceReload -> do
+            config <- gets stConfig
+            tell [CB.XBackendQuery $ fmap FileContent $ load config]
         FileContent cnt -> do
-            (cfg,_) <- get
-            put (cfg,Just cnt))
+            cfg <- gets stConfig
+            put (St cfg (Just cnt) (rebuildPtrStore cnt)))
+
     , CB.xaddReminder = (\pr -> do
-        config <- gets fst
+        config <- gets stConfig
         line <- reminderTemplate pr
         tell $ (:[]) $ CB.XBackendQuery $  do -- now, we're in IO
             path' <- expandTilde config
             appendFile path' line
             fmap FileContent $ load config)
+    , CB.itemSource = (\ptr -> do
+        location <- zoom stIdStore $ P.resolve ptr
+        return $ CB.ExistingFile location ForceReload)
     }
 
