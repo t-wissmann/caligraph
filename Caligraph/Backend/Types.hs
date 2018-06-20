@@ -95,10 +95,16 @@ data ItemSource event =
       -- | Source Text (Text -> queryType)
       -- ^ the source is provided, together with an event that updates the item
 
+data Event event =
+      SetRangeVisible (Day,Day)
+    | AddReminder PartialReminder
+    | Response event
+
+
 data XBackend state event = XBackend
-  { cachedIncarnations :: state -> (Day,Day) -> (Incarnations')
+  { xcreate :: (String -> Maybe String) -> Either String state
+  , cachedIncarnations :: state -> (Day,Day) -> (Incarnations')
   , setRangeVisible :: (Day,Day) -> XBackendM state event ()
-  , xcreate :: (String -> Maybe String) -> Either String state
   , handleResponse :: event -> XBackendM state event ()
   , xaddReminder :: PartialReminder -> XBackendM state event ()
   , itemSource :: Ptr -> XBackendM state event (ItemSource event)
