@@ -11,7 +11,6 @@ import Data.Maybe
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
-import Control.Monad.Writer
 import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
 import Data.Time.Calendar (Day,addDays,diffDays,fromGregorian,gregorianMonthLength)
@@ -190,14 +189,14 @@ backend = CB.XBackend
         items <- gets stItems
         case items of
             Just _ -> return ()
-            Nothing -> tell $ (:[]) $ CB.XBackendQuery $ fmap FileContent $ load config)
+            Nothing -> CB.callback $ fmap FileContent $ load config)
     , CB.xcreate = (\vals -> do
         conf <- parseConfig vals
         return $ St conf Nothing P.empty)
     , CB.handleResponse = (\q -> case q of
         ForceReload -> do
             config <- gets stConfig
-            tell [CB.XBackendQuery $ fmap FileContent $ load config]
+            CB.callback $ fmap FileContent $ load config
         FileContent cnt -> do
             cfg <- gets stConfig
             put (St cfg (Just cnt) (rebuildPtrStore cnt)))
@@ -205,7 +204,7 @@ backend = CB.XBackend
     , CB.xaddReminder = (\pr -> do
         config <- gets stConfig
         line <- reminderTemplate pr
-        tell $ (:[]) $ CB.XBackendQuery $  do -- now, we're in IO
+        CB.callback $ do -- now, we're in IO
             path' <- expandTilde config
             appendFile path' line
             fmap FileContent $ load config)

@@ -11,6 +11,7 @@ import Data.Time.Calendar (Day,addDays,diffDays)
 import Control.Monad.State (get, gets, lift, put,StateT,mapStateT)
 import Control.Monad.Reader (Reader,withReader,ReaderT,runReaderT)
 import Data.Functor.Identity
+import Control.Monad.Writer (tell)
 
 import System.FilePath
 
@@ -100,4 +101,7 @@ static_backend configparser initializer item2file remTemplate = Backend
         put (config,Nothing) -- force reload
       )
     }
+
+callback :: IO event -> XBackendM state event ()
+callback io_action = tell [XBackendQuery $ io_action]
 
