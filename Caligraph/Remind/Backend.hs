@@ -9,15 +9,19 @@ import Data.Either
 import Data.Maybe
 import Control.Monad.Identity
 import Control.Monad.Reader
+import Control.Monad.State
+import Control.Monad.Writer
 import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
 import Data.Time.Calendar (Day,addDays,diffDays,fromGregorian,gregorianMonthLength)
 
 import Data.Hashable
 
-data Config = Config FilePath
+type Config = FilePath
 type ItemID = (String,Int) -- filepath, linenumber
 type St = (Config, Maybe [CB.Item ItemID])
+data Event =
+      FileContent [CB.Item ItemID]
 
 algorithm :: itemid -> REM -> CB.Item itemid
 algorithm itemid (REM args msg) =
@@ -137,11 +141,11 @@ partialDateLifeTime pdate =
 parseConfig :: (String -> Maybe String) -> Either String Config
 parseConfig cfg =
     case (cfg "path") of
-        Just path -> return $ Config path
+        Just path -> return path
         Nothing -> Left "Mandatory setting 'path' missing"
 
 load :: Config -> IO [CB.Item ItemID]
-load (Config path) = do
+load path = do
   path' <- expandTilde path
   reminders <- parseFile path'
   return
@@ -154,11 +158,25 @@ load (Config path) = do
     isRem (i,Rem r) = Just (i,r)
     isRem _ = Nothing
 
-reminderTemplate :: CB.PartialReminder -> Reader Config (FilePath, String)
-reminderTemplate prem = do
-    Config path <- ask
-    return $ (,) path $ "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem ++ "\n"
+reminderTemplate :: CB.PartialReminder -> CB.XBackendM St Event String
+reminderTemplate prem =
+    return $ "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem ++ "\n"
 
-backend :: CB.Backend ItemID St
-backend = CB.static_backend parseConfig load id reminderTemplate
+backend :: CB.XBackend St ItemID Event
+backend = CB.XBackend
+    { CB.cachedIncarnations = (\st -> CB.query_items (fromMaybe [] $ snd st))
+    , CB.setRangeVisible = (\range -> return ())
+    , CB.xcreate = fmap (flip (,) Nothing) . parseConfig
+    , CB.handleResponse = (\q -> case q of
+        FileContent cnt -> do
+            (cfg,_) <- get
+            put (cfg,Just cnt))
+    , CB.xaddReminder = (\pr -> do
+        config <- gets fst
+        line <- reminderTemplate pr
+        tell $ (:[]) $ CB.XBackendQuery $  do -- now, we're in IO
+            path' <- expandTilde config
+            appendFile path' line
+            fmap FileContent $ load config)
+    }
 

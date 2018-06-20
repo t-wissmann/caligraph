@@ -85,13 +85,13 @@ data XBackendQuery a = XBackendQuery {
         bqIO :: (IO a)
     }
 
-type XBackendM state query = StateT state (Writer [XBackendQuery query]) ()
+type XBackendM state query a = StateT state (Writer [XBackendQuery query]) a
 
-data XBackend state query = XBackend
-  { cachedIncarnations :: (Day,Day) -> Reader state (Incarnations')
-  , setRangeVisible :: (Day,Day) -> XBackendM state query
+data XBackend state itemid query = XBackend
+  { cachedIncarnations :: state -> (Day,Day) -> (Incarnations itemid)
+  , setRangeVisible :: (Day,Day) -> XBackendM state query ()
   , xcreate :: (String -> Maybe String) -> Either String state
-  , handleResponse :: query -> XBackendM state query
-  , xaddReminder :: PartialReminder -> XBackendM state query
+  , handleResponse :: query -> XBackendM state query ()
+  , xaddReminder :: PartialReminder -> XBackendM state query ()
   }
 
