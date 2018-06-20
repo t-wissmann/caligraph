@@ -25,16 +25,16 @@ import Lens.Micro
 import Lens.Micro.TH
 import Lens.Micro.Mtl
 
-data RawCalendar stateType queryType = RawCalendar
+data RawCalendar stateType eventType = RawCalendar
     { _calState :: stateType
-    , _calBackend :: CB.XBackend stateType queryType
-    , _calOpenQueries :: [CB.XBackendQuery queryType]
+    , _calBackend :: CB.XBackend stateType eventType
+    , _calOpenQueries :: [CB.XBackendQuery eventType]
     }
 
 makeLenses ''RawCalendar
 
-data Calendar = forall stateType queryType.
-        Calendar (RawCalendar stateType queryType)
+data Calendar = forall stateType eventType.
+        Calendar (RawCalendar stateType eventType)
 
 zoomBackend :: (CB.XBackend s q -> CB.XBackendM s q a) -> State (RawCalendar s q) a
 zoomBackend state_action = do

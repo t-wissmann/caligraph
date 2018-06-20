@@ -85,7 +85,7 @@ data XBackendQuery a = XBackendQuery {
         bqIO :: (IO a)
     }
 
-type XBackendM state query a = StateT state (Writer [XBackendQuery query]) a
+type XBackendM state event a = StateT state (Writer [XBackendQuery event]) a
 
 -- | tell where the source code of an item can be edited
 data ItemSource event =
@@ -95,12 +95,12 @@ data ItemSource event =
       -- | Source Text (Text -> queryType)
       -- ^ the source is provided, together with an event that updates the item
 
-data XBackend state query = XBackend
+data XBackend state event = XBackend
   { cachedIncarnations :: state -> (Day,Day) -> (Incarnations')
-  , setRangeVisible :: (Day,Day) -> XBackendM state query ()
+  , setRangeVisible :: (Day,Day) -> XBackendM state event ()
   , xcreate :: (String -> Maybe String) -> Either String state
-  , handleResponse :: query -> XBackendM state query ()
-  , xaddReminder :: PartialReminder -> XBackendM state query ()
-  , itemSource :: Ptr -> XBackendM state query (ItemSource query)
+  , handleResponse :: event -> XBackendM state event ()
+  , xaddReminder :: PartialReminder -> XBackendM state event ()
+  , itemSource :: Ptr -> XBackendM state event (ItemSource event)
   }
 

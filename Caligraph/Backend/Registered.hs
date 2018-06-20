@@ -9,8 +9,8 @@ import qualified Caligraph.RemindPipe.Backend
 
 import Data.Hashable
 
-data SomeBackend = forall stateType queryType.
-        SomeBackend (XBackend stateType queryType)
+data SomeBackend = forall stateType eventType.
+        SomeBackend (XBackend stateType eventType)
 
 backends :: [(String, SomeBackend)]
 backends =
