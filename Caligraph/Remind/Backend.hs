@@ -165,7 +165,11 @@ reminderTemplate prem =
 backend :: CB.XBackend St ItemID Event
 backend = CB.XBackend
     { CB.cachedIncarnations = (\st -> CB.query_items (fromMaybe [] $ snd st))
-    , CB.setRangeVisible = (\range -> return ())
+    , CB.setRangeVisible = (\range -> do
+        (config,items) <- get
+        case items of
+            Just _ -> return ()
+            Nothing -> tell $ (:[]) $ CB.XBackendQuery $ fmap FileContent $ load config)
     , CB.xcreate = fmap (flip (,) Nothing) . parseConfig
     , CB.handleResponse = (\q -> case q of
         FileContent cnt -> do

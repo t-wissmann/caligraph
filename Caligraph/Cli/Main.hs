@@ -319,8 +319,19 @@ embed = mapStateT (return . runIdentity)
 
 updateDayRange' :: Monad m => Bool -> StateT St m ()
 updateDayRange' force = do
+    -- get currently visible day range
     day_range <- fmap DayGrid.rangeVisible $ use dayGrid
-    zoom calendar $ embed $ CC.setRangeVisible day_range
+
+    incs <- use visibleIncarnations
+    if (day_range == bounds incs) && not force
+       then return ()
+       else do
+         -- report it to the calendar
+         zoom calendar $ embed $ CC.setRangeVisible day_range
+         c <- use calendar
+         visibleIncarnations .= CC.cachedIncarnations c day_range
+    s <- get
+    dayGrid %= (DayGrid.resizeDays $ day2widget s)
 
 testmain :: IO ()
 testmain = do
