@@ -180,7 +180,7 @@ reminderTemplate :: CB.PartialReminder -> CB.XBackendM St Event String
 reminderTemplate prem =
     return $ "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem ++ "\n"
 
-backend :: CB.XBackend St ItemID Event
+backend :: CB.XBackend St Event
 backend = CB.XBackend
     { CB.cachedIncarnations = (\st ->
         fmap (fmap $ fmap $ fmap $ P.lookupUnsafe $ _stIdStore st)

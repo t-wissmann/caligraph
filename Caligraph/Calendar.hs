@@ -20,24 +20,23 @@ import Data.Time.Calendar (Day)
 
 import Data.Array
 import Data.Traversable
-import Data.Hashable
 
 import Lens.Micro
 import Lens.Micro.TH
 import Lens.Micro.Mtl
 
-data RawCalendar stateType itemID queryType = RawCalendar
+data RawCalendar stateType queryType = RawCalendar
     { _calState :: stateType
-    , _calBackend :: CB.XBackend stateType itemID queryType
+    , _calBackend :: CB.XBackend stateType queryType
     , _calOpenQueries :: [CB.XBackendQuery queryType]
     }
 
 makeLenses ''RawCalendar
 
-data Calendar = forall stateType itemID queryType. (Eq itemID, Hashable itemID) =>
-        Calendar (RawCalendar stateType itemID queryType)
+data Calendar = forall stateType queryType.
+        Calendar (RawCalendar stateType queryType)
 
-zoomBackend :: (CB.XBackend s i q -> CB.XBackendM s q a) -> State (RawCalendar s i q) a
+zoomBackend :: (CB.XBackend s q -> CB.XBackendM s q a) -> State (RawCalendar s q) a
 zoomBackend state_action = do
     be <- use calBackend
     st <- use calState
@@ -47,8 +46,8 @@ zoomBackend state_action = do
     return r
 
 
-doCalendar :: Monad m => (forall s i q. (Eq i, Hashable i) =>
-    StateT (RawCalendar s i q) m r) -> StateT Calendar m r
+doCalendar :: Monad m => (forall s q.
+    StateT (RawCalendar s q) m r) -> StateT Calendar m r
 doCalendar computation = do
     Calendar rc <- get
     (r, rc') <- lift $ runStateT computation rc
@@ -72,36 +71,6 @@ setRangeVisible range = doCalendar $ do zoomBackend $ (\be -> CB.setRangeVisible
 cachedIncarnations :: Calendar -> (Day,Day) -> CB.Incarnations'
 cachedIncarnations (Calendar c) range =
     (CB.cachedIncarnations (_calBackend c) (_calState c) range)
-    --let
-    --    lookup x = evalState (PS.lookup x) (_calIdStore c)
-    --    incs = 
-    --in fmap (map (fmap lookup)) incs
-    --  ^     ^    ^
-    --  |     |    |
-    --  |     |    '--- within an Incarnation
-    --  |     |
-    --  |     '--- for each Incarnation
-    --  |
-    --  '--- for each day
-    --
---query :: (Day,Day) -> CB.Incarnations'
----- ^ querying a certain day range, return a list of (cached) incarnations
---query dayRange = doCalendar $ query' dayRange
---
---query' :: (Eq i, Hashable i) => (Day,Day) -> State (RawCalendar i a) (CB.Incarnations')
----- ^ querying a certain day range, return a list of (cached) incarnations
---query' dayRange = do
---    be <- use calBackend
---    incs <- zoom calState (CB.query be dayRange)
---    incs' <- mapM (mapM (mapM (\x -> zoom idStore $ PS.lookup x))) incs
---    --        ^     ^      ^
---    --        |     |      |
---    --        |     |      '--- within an Incarnation
---    --        |     |
---    --        |     '--- for each Incarnation
---    --        |
---    --        '--- for each day
---    return (incs':: CB.Incarnations')
 
 dequeueIO :: Calendar -> Maybe (IO Calendar)
 dequeueIO (Calendar (RawCalendar st be queries)) = 

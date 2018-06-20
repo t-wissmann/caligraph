@@ -95,7 +95,7 @@ data ItemSource event =
       -- | Source Text (Text -> queryType)
       -- ^ the source is provided, together with an event that updates the item
 
-data XBackend state itemid query = XBackend
+data XBackend state query = XBackend
   { cachedIncarnations :: state -> (Day,Day) -> (Incarnations')
   , setRangeVisible :: (Day,Day) -> XBackendM state query ()
   , xcreate :: (String -> Maybe String) -> Either String state
