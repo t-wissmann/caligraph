@@ -188,7 +188,7 @@ add_reminder_cmd :: Cmd St
 add_reminder_cmd = do
     day <- use (dayGrid . DayGrid.focusDay)
     let title = "New Reminder"
-    zoom calendar $ CC.addReminder $ CB.PartialReminder day title Nothing Nothing Nothing
+    zoom calendar $ embed $ CC.addReminder $ CB.PartialReminder day title Nothing Nothing Nothing
 
 dequeueIO :: MonadIO io => StateT St io ()
 dequeueIO = do
@@ -320,14 +320,7 @@ embed = mapStateT (return . runIdentity)
 updateDayRange' :: Monad m => Bool -> StateT St m ()
 updateDayRange' force = do
     day_range <- fmap DayGrid.rangeVisible $ use dayGrid
-    incs <- use visibleIncarnations
-    if (day_range == bounds incs) && not force
-      then return ()
-      else do
-        incs' <- zoom calendar $ embed $ CC.query day_range
-        visibleIncarnations .= incs'
-    s <- get
-    dayGrid %= (DayGrid.resizeDays $ day2widget s)
+    zoom calendar $ embed $ CC.setRangeVisible day_range
 
 testmain :: IO ()
 testmain = do

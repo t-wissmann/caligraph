@@ -9,6 +9,8 @@ import Data.Ord
 import Data.Array
 import qualified Data.List as List
 import Control.Monad.State
+import Control.Monad.Reader
+import Control.Monad.Writer
 
 data Incarnation i = Incarnation
   { day :: Day
@@ -77,5 +79,19 @@ data Backend i state = Backend
   -- ^ given a partial reminder, add the specified item to the calendar
   , create :: (String -> Maybe String) -> Either String state
   -- ^ create a new instance given the config
+  }
+
+data XBackendQuery a = XBackendQuery {
+        bqIO :: (IO a)
+    }
+
+type XBackendM state query = StateT state (Writer [XBackendQuery query]) ()
+
+data XBackend state query = XBackend
+  { cachedIncarnations :: (Day,Day) -> Reader state (Incarnations')
+  , setRangeVisible :: (Day,Day) -> XBackendM state query
+  , xcreate :: (String -> Maybe String) -> Either String state
+  , handleResponse :: query -> XBackendM state query
+  , xaddReminder :: PartialReminder -> XBackendM state query
   }
 

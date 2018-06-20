@@ -2,21 +2,20 @@
 
 module Caligraph.Backend.Registered where
 
-import Caligraph.Backend.Types (Backend)
+import Caligraph.Backend.Types (XBackend)
 
 import qualified Caligraph.Remind.Backend
 import qualified Caligraph.RemindPipe.Backend
 
 import Data.Hashable
 
-data SomeBackend = forall identType backendState.
-    (Eq identType, Hashable identType) =>
-        SomeBackend (Backend identType backendState)
+data SomeBackend = forall stateType queryType.
+        SomeBackend (XBackend  stateType queryType)
 
 backends :: [(String, SomeBackend)]
 backends =
-    [ b "remindSimple"  Caligraph.Remind.Backend.backend
-    , b "remindPipe"    Caligraph.RemindPipe.Backend.backend
-    ]
+    -- [ b "remindSimple"  Caligraph.Remind.Backend.backend
+    --, b "remindPipe"    Caligraph.RemindPipe.Backend.backend
+    []
     where b x y = (x, SomeBackend y)
 
