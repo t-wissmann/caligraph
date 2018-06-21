@@ -15,7 +15,7 @@ data SomeBackend = forall stateType eventType.
 backends :: [(String, SomeBackend)]
 backends =
     [ b "remindSimple"  Caligraph.Remind.Backend.backend
-    --, b "remindPipe"    Caligraph.RemindPipe.Backend.backend
+    , b "remindPipe"    Caligraph.RemindPipe.Backend.backend
     ]
     where b x y = (x, SomeBackend y)
 

@@ -15,7 +15,7 @@ mapLeft :: (a -> b) -> Either a r -> Either b r
 mapLeft f (Left x) = Left (f x)
 mapLeft _ (Right x) = Right x
 
-parseRemOutput :: String -> [(Day,CB.Incarnation Identifier)]
+parseRemOutput :: String -> [(Day,CB.Incarnation SourceLocation)]
 parseRemOutput buffer = rights $ map parseIncarnation $ pair $ Split.endBy "\n" buffer
   where
     pair :: [a] -> [(a,a)]
@@ -23,12 +23,12 @@ parseRemOutput buffer = rights $ map parseIncarnation $ pair $ Split.endBy "\n" 
     pair (a:b:tl) = (a,b) : pair tl
     pair (_:[]) = []
 
-parseIncarnation :: (String,String) -> Either String (Day,CB.Incarnation Identifier)
+parseIncarnation :: (String,String) -> Either String (Day,CB.Incarnation SourceLocation)
 parseIncarnation (metadata_line,fields) = mapLeft show $ do
     ident <- P.parse meta_data "remind output" metadata_line
     P.parse (main_fields ident) "remind output" fields
 
-meta_data :: GenParser Char st Identifier
+meta_data :: GenParser Char st SourceLocation
 meta_data = do
     string "# fileinfo "
     line <- parseNum

@@ -102,7 +102,7 @@ data Event event =
 
 data XBackend state event = XBackend
   { xcreate :: (String -> Maybe String) -> Either String state
-  , cachedIncarnations :: state -> (Day,Day) -> (Incarnations')
+  , cachedIncarnations :: state -> (Day,Day) -> Incarnations'
   , handleEvent :: Event event -> XBackendM state event ()
   , itemSource :: Ptr -> XBackendM state event (ItemSource event)
   }
