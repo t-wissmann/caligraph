@@ -25,10 +25,17 @@ import Lens.Micro
 import Lens.Micro.TH
 import Lens.Micro.Mtl
 
+import Control.Concurrent.MVar
+import Control.Concurrent
+
 data RawCalendar stateType eventType = RawCalendar
     { _calState :: stateType
     , _calBackend :: CB.XBackend stateType eventType
     , _calOpenQueries :: [CB.XBackendQuery eventType]
+    , _calMVarQuery :: MVar (IO eventType)
+    , _calMVarResult :: MVar eventType
+    , _calWaitingForResult :: Bool
+    , _calWorker :: ThreadId
     }
 
 makeLenses ''RawCalendar
@@ -36,7 +43,7 @@ makeLenses ''RawCalendar
 data Calendar = forall stateType eventType.
         Calendar (RawCalendar stateType eventType)
 
-zoomBackend :: (CB.XBackend s q -> CB.XBackendM s q a) -> State (RawCalendar s q) a
+zoomBackend :: Monad m => (CB.XBackend s q -> CB.XBackendM s q a) -> StateT (RawCalendar s q) m a
 zoomBackend state_action = do
     be <- use calBackend
     st <- use calState
@@ -44,7 +51,6 @@ zoomBackend state_action = do
     calState .= new_st
     calOpenQueries %= (++) new_queries
     return r
-
 
 doCalendar :: Monad m => (forall s q.
     StateT (RawCalendar s q) m r) -> StateT Calendar m r
@@ -54,12 +60,20 @@ doCalendar computation = do
     put (Calendar rc')
     return r
 
-fromConfig :: Conf.CalendarConfig -> Either String Calendar
-fromConfig cc = do
+fromConfig :: IO () -> Conf.CalendarConfig -> Either String (IO Calendar)
+fromConfig noticeDataReady cc = do
     (_,CBR.SomeBackend be) <- maybe (Left $ "No backend named \"" ++ bet ++ "\"") Right $
         find ((==) bet . fst) CBR.backends
     state <- CB.xcreate be getOption
-    return $ Calendar $ RawCalendar state be []
+    return $ do
+        args <- newEmptyMVar
+        results <- newEmptyMVar
+        thread <- forkIO $ forever $ do
+            action <- takeMVar args
+            r <- action
+            noticeDataReady
+            putMVar results r
+        return $ Calendar $ RawCalendar state be [] args results False thread
     where
         bet = Conf.backendType cc
         getOption :: String -> Maybe String
@@ -72,14 +86,27 @@ cachedIncarnations :: Calendar -> (Day,Day) -> CB.Incarnations'
 cachedIncarnations (Calendar c) range =
     (CB.cachedIncarnations (_calBackend c) (_calState c) range)
 
-dequeueIO :: Calendar -> Maybe (IO Calendar)
-dequeueIO (Calendar (RawCalendar st be queries)) = 
-    case queries of
-        [] -> Nothing
-        _ -> Just $ do
-            responses <- mapM CB.bqIO queries
-            let (((),st'), queries') = runWriter $ flip runStateT st $ mapM_ (CB.handleResponse be) responses
-            return (Calendar (RawCalendar st' be queries'))
+fileQuery :: MonadIO io => StateT Calendar io ()
+fileQuery = doCalendar $ do
+    waiting <- use calWaitingForResult
+    queue <- use calOpenQueries
+    unless waiting $ do
+        case queue of
+            [] -> return ()
+            ((CB.XBackendQuery action):queue') -> do
+                mv <- use calMVarQuery
+                liftIO $ putMVar mv action
+                calWaitingForResult .= True
+                calOpenQueries .= queue'
+
+receiveResult :: MonadIO io => StateT Calendar io ()
+receiveResult = doCalendar $ do
+    waiting <- use calWaitingForResult
+    when waiting $ do
+        mv <- use calMVarResult
+        res <- liftIO $ takeMVar mv
+        calWaitingForResult .= False
+        zoomBackend $ (\be -> CB.handleResponse be res)
 
 editExternally :: MonadIO io => Ptr -> StateT Calendar io ()
 editExternally ptr = doCalendar $ do
@@ -95,4 +122,5 @@ editExternally ptr = doCalendar $ do
 
 addReminder :: CB.PartialReminder -> State Calendar ()
 addReminder pr = doCalendar $ zoomBackend (\be -> CB.xaddReminder be pr)
+
 

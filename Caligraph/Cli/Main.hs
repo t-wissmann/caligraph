@@ -5,6 +5,7 @@ module Caligraph.Cli.Main where
 import Brick
 import Brick.Widgets.Border
 import Brick.Main
+import Brick.BChan
 import Brick.Widgets.Core (withAttr,vBox,(<+>))
 import Brick.AttrMap (attrMap, AttrMap)
 import Brick.Widgets.Border.Style
@@ -49,6 +50,8 @@ import Lens.Micro
 import Lens.Micro.Mtl
 
 type St =  Caligraph.Cli.AppState.AppState
+
+data ExternalEvent = CalendarIO
 
 data CmdOutput = CmdOutput
     { cmdoutStderr :: [String]
@@ -190,19 +193,16 @@ add_reminder_cmd = do
     let title = "New Reminder"
     zoom calendar $ embed $ CC.addReminder $ CB.PartialReminder day title Nothing Nothing Nothing
 
-dequeueIO :: MonadIO io => StateT St io ()
-dequeueIO = do
-    c <- use calendar
-    case CC.dequeueIO c of
-        Nothing -> return ()
-        Just io_action -> do
-            c' <- liftIO $ io_action
-            calendar .= c'
-            updateDayRange' True
-            -- fix focusItem
-            day <- use $ dayGrid . DayGrid.focusDay
-            reminders <- getReminders day
-            focusItem %= fmap (min $ length reminders - 1)
+fileIOQueries :: MonadIO io => StateT St io ()
+fileIOQueries = do
+    zoom calendar $ CC.fileQuery
+
+fixFocusItem :: Monad m => StateT St m ()
+fixFocusItem = do
+    updateDayRange' True
+    day <- use $ dayGrid . DayGrid.focusDay
+    reminders <- getReminders day
+    focusItem %= fmap (min $ length reminders - 1)
 
 ui st =
   [DayGrid.render (st^.dayGrid) <=> footer]
@@ -227,7 +227,7 @@ tryEnableMouse = do
   return ()
 
 
-mainApp :: App St () WidgetName
+mainApp :: App St ExternalEvent WidgetName
 mainApp =
   App { appDraw = ui
       , appChooseCursor = showFirstCursor
@@ -260,13 +260,13 @@ continueOrHalt s =
     then halt s
     else continue s
 
-myHandleEvent :: St -> BrickEvent WidgetName () -> EventM WidgetName (Next St)
+myHandleEvent :: St -> BrickEvent WidgetName ExternalEvent -> EventM WidgetName (Next St)
 myHandleEvent s (VtyEvent e) =
   case e of
     EvKey key mods ->
       case Map.lookup (mods,key) binds of
         Just cmd ->
-            let Breakpoint io_action = runStateT (do cmd ; dequeueIO) s in
+            let Breakpoint io_action = runStateT (do cmd ; fileIOQueries) s in
             do
                 possibly_io <- liftIO $ io_action
                 case possibly_io of
@@ -284,7 +284,18 @@ myHandleEvent s (VtyEvent e) =
       continue (s & dayGrid %~ DayGrid.scroll (-scrollStep) & updateDayRange)
     _ ->
       continue s
-myHandleEvent s (AppEvent ()) = continue s
+myHandleEvent s (AppEvent ev) =
+    case ev of
+        CalendarIO -> do
+            s' <- flip execStateT s $ do
+                zoom calendar CC.receiveResult
+                zoom calendar CC.fileQuery
+                c <- use calendar
+                incs <- use visibleIncarnations
+                visibleIncarnations .= CC.cachedIncarnations c (bounds incs)
+                s'' <- get
+                dayGrid %= (DayGrid.resizeDays $ day2widget s'')
+            continue s'
 myHandleEvent s (MouseDown (WNDay d) BLeft _ _) =
       continue (s & dayGrid %~ DayGrid.setFocus d & focusItem .~ Just 0 & updateDayRange)
 myHandleEvent s (MouseDown (WNDayItem d idx) BLeft _ _) =
@@ -339,15 +350,16 @@ testmain = do
   today <- DayGrid.getToday
   args <- getArgs
   raw_calendars <- Config.load >>= rightOrDie
-  cal <- rightOrDie $ CC.fromConfig (snd $ raw_calendars !! 0)
-  cal_loaded <-
-    case CC.dequeueIO cal of
-        Nothing -> return cal
-        Just io_action -> io_action
-  customMain buildVty Nothing mainApp
+  chan <- newBChan (1 + length raw_calendars)
+  cal <- rightOrDie $ CC.fromConfig (writeBChan chan CalendarIO) (snd $ raw_calendars !! 0)
+  cal' <- cal
+  let day_grid = (DayGrid.init WNDayGrid today)
+  let day_range = DayGrid.rangeVisible day_grid
+  ((), cal_loaded) <- runStateT (do embed (CC.setRangeVisible day_range); CC.fileQuery) cal'
+  customMain buildVty (Just chan) mainApp
     (AppState
         False
-        (DayGrid.init WNDayGrid today)
+        day_grid
         (array (today,addDays (-1) today) [])
         (Just 0)
         cal_loaded
