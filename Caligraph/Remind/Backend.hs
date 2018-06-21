@@ -179,35 +179,40 @@ reminderTemplate :: CB.PartialReminder -> CB.XBackendM St Event String
 reminderTemplate prem =
     return $ "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem ++ "\n"
 
+
+handleEvent :: CB.Event Event -> CB.XBackendM St Event ()
+handleEvent (CB.SetRangeVisible range) = do
+    config <- gets stConfig
+    items <- gets stItems
+    case items of
+        Just _ -> return ()
+        Nothing -> CB.callback $ fmap FileContent $ load config
+
+handleEvent (CB.Response ForceReload) = do
+    config <- gets stConfig
+    CB.callback $ fmap FileContent $ load config
+
+handleEvent (CB.Response (FileContent cnt)) = do
+    cfg <- gets stConfig
+    put (St cfg (Just cnt) (rebuildPtrStore cnt))
+
+handleEvent (CB.AddReminder pr) = do
+    config <- gets stConfig
+    line <- reminderTemplate pr
+    CB.callback $ do -- now, we're in IO
+        path' <- expandTilde config
+        appendFile path' line
+        fmap FileContent $ load config
+
 backend :: CB.XBackend St Event
 backend = CB.XBackend
     { CB.cachedIncarnations = (\st ->
         fmap (fmap $ fmap $ fmap $ P.lookupUnsafe $ _stIdStore st)
         $ CB.query_items (fromMaybe [] (stItems st)))
-    , CB.setRangeVisible = (\range -> do
-        config <- gets stConfig
-        items <- gets stItems
-        case items of
-            Just _ -> return ()
-            Nothing -> CB.callback $ fmap FileContent $ load config)
     , CB.xcreate = (\vals -> do
         conf <- parseConfig vals
         return $ St conf Nothing P.empty)
-    , CB.handleResponse = (\q -> case q of
-        ForceReload -> do
-            config <- gets stConfig
-            CB.callback $ fmap FileContent $ load config
-        FileContent cnt -> do
-            cfg <- gets stConfig
-            put (St cfg (Just cnt) (rebuildPtrStore cnt)))
-
-    , CB.xaddReminder = (\pr -> do
-        config <- gets stConfig
-        line <- reminderTemplate pr
-        CB.callback $ do -- now, we're in IO
-            path' <- expandTilde config
-            appendFile path' line
-            fmap FileContent $ load config)
+    , CB.handleEvent = handleEvent
     , CB.itemSource = (\ptr -> do
         location <- zoom stIdStore $ P.resolve ptr
         return $ CB.ExistingFile location ForceReload)

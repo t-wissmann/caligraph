@@ -100,13 +100,10 @@ data Event event =
     | AddReminder PartialReminder
     | Response event
 
-
 data XBackend state event = XBackend
   { xcreate :: (String -> Maybe String) -> Either String state
   , cachedIncarnations :: state -> (Day,Day) -> (Incarnations')
-  , setRangeVisible :: (Day,Day) -> XBackendM state event ()
-  , handleResponse :: event -> XBackendM state event ()
-  , xaddReminder :: PartialReminder -> XBackendM state event ()
+  , handleEvent :: Event event -> XBackendM state event ()
   , itemSource :: Ptr -> XBackendM state event (ItemSource event)
   }
 

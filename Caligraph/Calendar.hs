@@ -52,6 +52,9 @@ zoomBackend state_action = do
     calOpenQueries %= (++) new_queries
     return r
 
+zoomBackendEvent :: Monad m => (CB.Event q) -> StateT (RawCalendar s q) m ()
+zoomBackendEvent ev = zoomBackend (\be -> CB.handleEvent be ev)
+
 doCalendar :: Monad m => (forall s q.
     StateT (RawCalendar s q) m r) -> StateT Calendar m r
 doCalendar computation = do
@@ -80,7 +83,7 @@ fromConfig noticeDataReady cc = do
         getOption x = fmap T.unpack $ M.lookup (T.pack x) $ Conf.allSettings cc
 
 setRangeVisible :: (Day,Day) -> State Calendar ()
-setRangeVisible range = doCalendar $ do zoomBackend $ (\be -> CB.setRangeVisible be range)
+setRangeVisible range = doCalendar $ do zoomBackendEvent $ CB.SetRangeVisible range
 
 cachedIncarnations :: Calendar -> (Day,Day) -> CB.Incarnations'
 cachedIncarnations (Calendar c) range =
@@ -106,7 +109,7 @@ receiveResult = doCalendar $ do
         mv <- use calMVarResult
         res <- liftIO $ takeMVar mv
         calWaitingForResult .= False
-        zoomBackend $ (\be -> CB.handleResponse be res)
+        zoomBackendEvent $ CB.Response res
 
 editExternally :: MonadIO io => Ptr -> StateT Calendar io ()
 editExternally ptr = doCalendar $ do
@@ -114,13 +117,13 @@ editExternally ptr = doCalendar $ do
     CB.ExistingFile (path, line) cb <- CU.embed $ zoomBackend (\be -> CB.itemSource be ptr)
     path' <- liftIO $ CU.expandTilde path
     liftIO $ CU.editFileExternally path' line
-    CU.embed $ zoomBackend (\be -> CB.handleResponse be cb)
+    CU.embed $ zoomBackendEvent $ CB.Response cb
 
     ---- st <- get
     ---- be <- return (st^.calBackend)
     --zoom calState $ mapStateT liftIO $ CB.editExternally be identifier
 
 addReminder :: CB.PartialReminder -> State Calendar ()
-addReminder pr = doCalendar $ zoomBackend (\be -> CB.xaddReminder be pr)
+addReminder pr = doCalendar $ zoomBackendEvent $ CB.AddReminder pr
 
 
