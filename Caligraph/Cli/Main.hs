@@ -215,7 +215,7 @@ ui st =
 getReminders :: Monad m => Day -> StateT St m [CB.Incarnation']
 getReminders day = do
     visibInc <- use visibleIncarnations
-    return $ fromMaybe [] $ safeArray visibInc day
+    return $ L.sort $ fromMaybe [] $ safeArray visibInc day
 
 tryEnableMouse :: EventM WidgetName ()
 tryEnableMouse = do
