@@ -109,8 +109,11 @@ handleEvent (CB.SetRangeVisible days) = do
       cacheMisses %= M.insert m False
 
 handleEvent (CB.AddReminder pr) = return ()
-handleEvent (CB.Response (FlushCache)) =
-  monthCache .= M.empty
+handleEvent (CB.Response (FlushCache)) = do
+  mc <- use monthCache
+  forM_ (M.keys mc) $ \m -> do
+      cacheMisses %= M.insert m False
+
 handleEvent (CB.Response (MonthData m days)) = do
   days' <- flip mapM days $ \inc -> do
     ptr <- zoom idStore $ PS.lookupOrInsert (CB.itemId inc)
