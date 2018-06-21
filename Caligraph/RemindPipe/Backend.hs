@@ -74,16 +74,13 @@ monthsCovered (from,to) = [(from_y,from_m)] ++ months_in_between ++ [(to_y,to_m)
 
 cachedIncarnations :: St -> (Day,Day) -> CB.Incarnations'
 cachedIncarnations st (from,to) =
-  -- A.accumArray (flip (:)) [] (from,to) []
   A.array (from,to)
   $ takeWhile (\(d,_) -> d <= to)
   $ dropWhile (\(d,_) -> d < from)
-  $ concat
-  $ forM (monthsCovered (from,to))
+  $ flip concatMap (monthsCovered (from,to))
   $ (\m ->
-     --fromMaybe
-     (map (flip (,) []) $ range $ monthRange m)
-     -- $ fmap A.assocs (M.lookup m (_monthCache st))
+     fromMaybe (map (flip (,) []) $ range $ monthRange m)
+     (fmap A.assocs (M.lookup m (_monthCache st)))
      )
 
 
@@ -115,11 +112,11 @@ handleEvent (CB.AddReminder pr) = return ()
 handleEvent (CB.Response (FlushCache)) =
   monthCache .= M.empty
 handleEvent (CB.Response (MonthData m days)) = do
-  --days' <- flip mapM days $ \inc -> do
-  --  ptr <- zoom idStore $ PS.lookupOrInsert (CB.itemId inc)
-  --  return (CB.day inc, inc { CB.itemId = ptr})
-  --cacheMisses %= M.delete m
-  --monthCache %= M.insert m ((A.accumArray (flip (:)) [] (monthRange m) days') :: CB.Incarnations')
+  days' <- flip mapM days $ \inc -> do
+    ptr <- zoom idStore $ PS.lookupOrInsert (CB.itemId inc)
+    return (CB.day inc, inc { CB.itemId = ptr})
+  cacheMisses %= M.delete m
+  monthCache %= M.insert m ((A.accumArray (flip (:)) [] (monthRange m) days') :: CB.Incarnations')
   return ()
 
 requestMissingMonths :: CB.XBackendM St Event ()
@@ -142,7 +139,7 @@ backend = CB.XBackend
     return $ CB.ExistingFile location FlushCache)
   , CB.handleEvent = (\ev -> do
       handleEvent ev
-      --requestMissingMonths
+      requestMissingMonths
       )
   }
 
