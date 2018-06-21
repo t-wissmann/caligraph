@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Caligraph.RemindPipe.Backend where
 
+import Caligraph.Remind.Backend (reminderTemplate)
 import Caligraph.RemindPipe.Types
 import Caligraph.RemindPipe.Parser (parseRemOutput)
 import qualified Caligraph.Backend.Types as CB
@@ -31,6 +32,7 @@ import Debug.Trace
 -- basically parse the output of  remind -r -s -l file month year
 data St = St
     { _path :: String -- a filepath with tilde not yet expanded
+    , _pathNewReminders :: String -- a filepath with tilde not yet expanded
     , _monthCache :: M.Map Month (CB.Incarnations')
     -- ^ mapping a month to the full array for all days of that month
     , _cacheMisses :: M.Map Month Bool
@@ -87,7 +89,9 @@ cachedIncarnations st (from,to) =
 parseConfig :: (String -> Maybe String) -> Either String St
 parseConfig cfg =
     case (cfg "path") of
-        Just path -> return $ St path M.empty M.empty PS.empty
+        Just path ->
+            let path_nr = fromMaybe path (cfg "path_append") in
+            return $ St path path_nr M.empty M.empty PS.empty
         Nothing -> Left "Mandatory setting 'path' missing"
 
 requestMonth :: FilePath -> Month -> IO Event
@@ -108,7 +112,13 @@ handleEvent (CB.SetRangeVisible days) = do
     when (not (m `M.member` mc) && not (m `M.member` misses)) $
       cacheMisses %= M.insert m False
 
-handleEvent (CB.AddReminder pr) = return ()
+handleEvent (CB.AddReminder pr) = do
+  tilde_path <- use pathNewReminders
+  CB.callback $ do -- now, we're in IO
+      path' <- expandTilde tilde_path
+      appendFile path' $ reminderTemplate pr
+      return FlushCache
+
 handleEvent (CB.Response (FlushCache)) = do
   mc <- use monthCache
   forM_ (M.keys mc) $ \m -> do

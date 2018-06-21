@@ -175,9 +175,9 @@ rebuildPtrStore :: (Eq i, Hashable i) => [CB.Item i] -> P.PointerStore i
 rebuildPtrStore items =
     execState (mapM (P.lookupOrInsert . CB.identifier) items) P.empty
 
-reminderTemplate :: CB.PartialReminder -> CB.XBackendM St Event String
+reminderTemplate :: CB.PartialReminder -> String
 reminderTemplate prem =
-    return $ "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem ++ "\n"
+    "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem ++ "\n"
 
 
 handleEvent :: CB.Event Event -> CB.XBackendM St Event ()
@@ -198,10 +198,9 @@ handleEvent (CB.Response (FileContent cnt)) = do
 
 handleEvent (CB.AddReminder pr) = do
     config <- gets stConfig
-    line <- reminderTemplate pr
     CB.callback $ do -- now, we're in IO
         path' <- expandTilde config
-        appendFile path' line
+        appendFile path' $ reminderTemplate pr
         fmap FileContent $ load config
 
 backend :: CB.XBackend St Event
