@@ -87,6 +87,39 @@ weekPerRow = RowController
   , _tableWidth = (\fullwidth -> ((fullwidth - 1) `div` 7) * 7 + 1)
   }
 
+halfweekPerRow :: RowController
+halfweekPerRow = RowController
+  { _rowOf = \day ->
+      let (_,_,dayOfWeek) = toWeekDate day in
+      if dayOfWeek <= 3 then
+        [1 - toInteger dayOfWeek .. 3 - toInteger dayOfWeek]
+        & map (flip addDays day)
+      else
+        [4 - toInteger dayOfWeek .. 7 - toInteger dayOfWeek]
+        & map (flip addDays day)
+  , _columns = 4
+  , _surroundingDays = \day ->
+      let (_,_,dayOfWeek) = toWeekDate day in
+      fmap (flip addDays day) $
+      case dayOfWeek of
+        1 -> Surrounding Nothing (Just (-4)) (Just (-3)) Nothing
+        2 -> Surrounding (Just (-5)) (Just (-4)) (Just (-3)) (Just (-1))
+        3 -> Surrounding (Just (-5)) (Just (-4)) (Just (-3)) (Just (-1))
+        4 -> Surrounding Nothing (Just (-3)) (Just (-2)) Nothing
+        5 -> Surrounding (Just (-4)) (Just (-3)) (Just (-2)) (Just (-1))
+        6 -> Surrounding (Just (-4)) (Just (-3)) (Just (-2)) (Just (-1))
+        7 -> Surrounding (Just (-4)) Nothing Nothing (Just (-1))
+        _ -> Surrounding Nothing Nothing Nothing Nothing
+  , _previousRow = (\row ->
+        map (flip addDays (row !! 0))
+          $ if length row == 3 then [-4,-3,-2,-1] else [-3,-2,-1])
+  , _nextRow     = (\row ->
+        map (flip addDays (row !! 0))
+          $ if length row == 3 then [3,4,5,6] else [4,5,6])
+  , _dayWidth = (\d fullwidth -> (fullwidth - 1) `div` 4)
+  , _tableWidth = (\fullwidth -> ((fullwidth - 1) `div` 4) * 4 + 1)
+  }
+
 -- | The internal state
 data St n = St
   { _widgetName :: n
@@ -222,11 +255,26 @@ render st =
       let
         gapLeftWidth = (fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
         gapLeftWidget = str $ map (const ' ') [1..gapLeftWidth]
+        renderEmptySpace renderedDays =
+          if length days == (rc^.columns)
+          then renderedDays
+          else
+            let
+              w = ((rc^.tableWidth) fullwidth) - sum (map fst renderedDays)
+              bs = if last ((rc^.previousRow) days) == (st^.focusDay)
+                   then UJ.Strong
+                   else UJ.Normal
+            in
+            renderedDays ++
+              [ (w, forceAttr "cellBorder" $
+                      UJ.withLineType bs hBorder
+                      <+> str [UJ.get bs UJ.Empty UJ.Empty bs])]
       in
       days
       & map (\d -> ((rc^.dayWidth) d fullwidth, d))
       & map (\(width,d) -> (width, snd $ renderDay st width d))
       & flip (++) [(1, renderRightmostBorder st $ last days)]
+      & renderEmptySpace
       & map (\(width,d) -> setAvailableSize (width,height) d)
       & map (cropTopBy ct)
       & map (cropBottomBy cb)
@@ -491,12 +539,21 @@ resize (w,h) s = s
 
 dayInDirecton :: St n -> Dir -> Day
 dayInDirecton st dir =
-    flip addDays (st^.focusDay) $
+    let
+      rc = (st^.rowController)
+      day = (st^.focusDay)
+      curRow = (rc^.rowOf) day
+      column = fromJust $ L.elemIndex day curRow
+      saveIdx idx lst =
+        if idx >= length lst
+        then lst !! (length lst - 1)
+        else lst !! idx
+    in
     case dir of
-        DirUp -> (-7)
-        DirDown -> 7
-        DirLeft -> (-1)
-        DirRight -> 1
+        DirUp -> saveIdx column $ (rc^.previousRow) curRow
+        DirDown -> saveIdx column $ (rc^.nextRow) curRow
+        DirLeft -> addDays (-1) day
+        DirRight -> addDays 1 day
 
 moveFocus :: Dir -> St n -> St n
 moveFocus d st =
