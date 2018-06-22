@@ -51,6 +51,9 @@ nextMonth :: Month -> Month
 nextMonth (year,m) =
     (year + (fromIntegral m) `div` 12, 1 + (m `mod` 12))
 
+showMonth :: Month -> String
+showMonth (y,m) = (show y) ++ "-" ++ (show m)
+
 previousMonth :: Month -> Month
 previousMonth (year,m) =
     if m == 1 then (year - 1, 12)
@@ -114,7 +117,7 @@ handleEvent (CB.SetRangeVisible days) = do
 
 handleEvent (CB.AddReminder pr) = do
   tilde_path <- use pathNewReminders
-  CB.callback $ do -- now, we're in IO
+  CB.callback ("Adding reminder to " ++ tilde_path) $ do
       path' <- expandTilde tilde_path
       appendFile path' $ reminderTemplate pr
       return FlushCache
@@ -138,7 +141,9 @@ requestMissingMonths = do
   cm <- use cacheMisses
   cm' <- flip M.traverseWithKey cm (\m v -> do
     -- if v is not True, then we don't have a request for it yet
-    unless v $ CB.callback $ requestMonth tilde_path m
+    unless v $
+        CB.callback ("Requesting month " ++ showMonth m) $
+            requestMonth tilde_path m
     return True)
   cacheMisses .= cm'
 

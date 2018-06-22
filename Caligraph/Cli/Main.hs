@@ -195,7 +195,11 @@ add_reminder_cmd = do
 
 fileIOQueries :: MonadIO io => StateT St io ()
 fileIOQueries = do
-    zoom calendar $ CC.fileQuery
+    log <- zoom calendar $ CC.fileQuery
+    case log of
+        Just m -> messages %= (:) m
+        Nothing -> return ()
+
 
 fixFocusItem :: Monad m => StateT St m ()
 fixFocusItem = do
@@ -289,7 +293,10 @@ myHandleEvent s (AppEvent ev) =
         CalendarIO -> do
             s' <- flip execStateT s $ do
                 zoom calendar CC.receiveResult
-                zoom calendar CC.fileQuery
+                log <- zoom calendar $ CC.fileQuery
+                case log of
+                    Just m -> messages %= (:) m
+                    Nothing -> return ()
                 c <- use calendar
                 incs <- use visibleIncarnations
                 visibleIncarnations .= CC.cachedIncarnations c (bounds incs)
@@ -355,7 +362,8 @@ testmain = do
   cal' <- cal
   let day_grid = (DayGrid.init WNDayGrid today)
   let day_range = DayGrid.rangeVisible day_grid
-  ((), cal_loaded) <- runStateT (do embed (CC.setRangeVisible day_range); CC.fileQuery) cal'
+  (msg, cal_loaded) <- runStateT (do embed (CC.setRangeVisible day_range); CC.fileQuery) cal'
+  let log = maybeToList msg
   customMain buildVty (Just chan) mainApp
     (AppState
         False
@@ -363,7 +371,7 @@ testmain = do
         (array (today,addDays (-1) today) [])
         (Just 0)
         cal_loaded
-        ["Caligraph started"])
+        log)
   return ()
 
 rightOrDie :: Either String a -> IO a

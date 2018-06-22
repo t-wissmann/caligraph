@@ -186,11 +186,13 @@ handleEvent (CB.SetRangeVisible range) = do
     items <- gets stItems
     case items of
         Just _ -> return ()
-        Nothing -> CB.callback $ fmap FileContent $ load config
+        Nothing ->
+            CB.callback ("Reloading " ++ config)
+            $ fmap FileContent $ load config
 
 handleEvent (CB.Response ForceReload) = do
     config <- gets stConfig
-    CB.callback $ fmap FileContent $ load config
+    CB.callback ("Reloading " ++ config) $ fmap FileContent $ load config
 
 handleEvent (CB.Response (FileContent cnt)) = do
     cfg <- gets stConfig
@@ -198,7 +200,7 @@ handleEvent (CB.Response (FileContent cnt)) = do
 
 handleEvent (CB.AddReminder pr) = do
     config <- gets stConfig
-    CB.callback $ do -- now, we're in IO
+    CB.callback ("Adding reminder and reloading " ++ config) $ do
         path' <- expandTilde config
         appendFile path' $ reminderTemplate pr
         fmap FileContent $ load config

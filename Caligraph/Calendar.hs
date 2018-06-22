@@ -89,18 +89,19 @@ cachedIncarnations :: Calendar -> (Day,Day) -> CB.Incarnations'
 cachedIncarnations (Calendar c) range =
     (CB.cachedIncarnations (_calBackend c) (_calState c) range)
 
-fileQuery :: MonadIO io => StateT Calendar io ()
+fileQuery :: MonadIO io => StateT Calendar io (Maybe String)
 fileQuery = doCalendar $ do
     waiting <- use calWaitingForResult
     queue <- use calOpenQueries
-    unless waiting $ do
+    if waiting then return Nothing else do
         case queue of
-            [] -> return ()
-            ((CB.BackendQuery action):queue') -> do
+            [] -> return Nothing
+            ((CB.BackendQuery msg action):queue') -> do
                 mv <- use calMVarQuery
                 liftIO $ putMVar mv action
                 calWaitingForResult .= True
                 calOpenQueries .= queue'
+                return $ Just msg
 
 receiveResult :: MonadIO io => StateT Calendar io ()
 receiveResult = doCalendar $ do

@@ -62,6 +62,6 @@ read_only computation = do
     s <- get
     lift $ runReaderT computation s
 
-callback :: IO event -> BackendM state event ()
-callback io_action = tell [BackendQuery $ io_action]
+callback :: String -> IO event -> BackendM state event ()
+callback txt io_action = tell [BackendQuery txt io_action]
 

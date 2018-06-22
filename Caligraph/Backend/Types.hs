@@ -69,8 +69,9 @@ data Item i = Item
 type Incarnations i = Array Day [Incarnation i]
 type Incarnations' = Array Day [Incarnation']
 
-data BackendQuery a = BackendQuery {
-        bqIO :: (IO a)
+data BackendQuery a = BackendQuery
+    { bqMesg :: String
+    , bqIO :: (IO a)
     }
 
 type BackendM state event a = StateT state (Writer [BackendQuery event]) a
