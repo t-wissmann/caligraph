@@ -180,7 +180,7 @@ reminderTemplate prem =
     "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem ++ "\n"
 
 
-handleEvent :: CB.Event Event -> CB.XBackendM St Event ()
+handleEvent :: CB.Event Event -> CB.BackendM St Event ()
 handleEvent (CB.SetRangeVisible range) = do
     config <- gets stConfig
     items <- gets stItems
@@ -203,12 +203,12 @@ handleEvent (CB.AddReminder pr) = do
         appendFile path' $ reminderTemplate pr
         fmap FileContent $ load config
 
-backend :: CB.XBackend St Event
-backend = CB.XBackend
+backend :: CB.Backend St Event
+backend = CB.Backend
     { CB.cachedIncarnations = (\st ->
         fmap (fmap $ fmap $ fmap $ P.lookupUnsafe $ _stIdStore st)
         $ CB.query_items (fromMaybe [] (stItems st)))
-    , CB.xcreate = (\vals -> do
+    , CB.create = (\vals -> do
         conf <- parseConfig vals
         return $ St conf Nothing P.empty)
     , CB.handleEvent = handleEvent

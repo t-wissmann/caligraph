@@ -2,7 +2,7 @@
 
 module Caligraph.Backend.Registered where
 
-import Caligraph.Backend.Types (XBackend)
+import Caligraph.Backend.Types (Backend)
 
 import qualified Caligraph.Remind.Backend
 import qualified Caligraph.RemindPipe.Backend
@@ -10,7 +10,7 @@ import qualified Caligraph.RemindPipe.Backend
 import Data.Hashable
 
 data SomeBackend = forall stateType eventType.
-        SomeBackend (XBackend stateType eventType)
+        SomeBackend (Backend stateType eventType)
 
 backends :: [(String, SomeBackend)]
 backends =

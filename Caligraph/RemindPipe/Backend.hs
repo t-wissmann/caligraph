@@ -104,7 +104,7 @@ requestMonth tilde_path (y,month) = do
     let days_in_month = parseRemOutput raw_output
     return $ MonthData (y,month) (map snd days_in_month)
 
-handleEvent :: CB.Event Event -> CB.XBackendM St Event ()
+handleEvent :: CB.Event Event -> CB.BackendM St Event ()
 handleEvent (CB.SetRangeVisible days) = do
   mc <- use monthCache
   misses <- use cacheMisses
@@ -132,7 +132,7 @@ handleEvent (CB.Response (MonthData m days)) = do
   monthCache %= M.insert m ((A.accumArray (flip (:)) [] (monthRange m) days') :: CB.Incarnations')
   return ()
 
-requestMissingMonths :: CB.XBackendM St Event ()
+requestMissingMonths :: CB.BackendM St Event ()
 requestMissingMonths = do
   tilde_path <- use path
   cm <- use cacheMisses
@@ -143,9 +143,9 @@ requestMissingMonths = do
   cacheMisses .= cm'
 
 
-backend :: CB.XBackend St Event
-backend = CB.XBackend
-  { CB.xcreate = parseConfig
+backend :: CB.Backend St Event
+backend = CB.Backend
+  { CB.create = parseConfig
   , CB.cachedIncarnations = cachedIncarnations
   , CB.itemSource = (\ptr -> do
     location <- zoom idStore $ PS.resolve ptr

@@ -69,23 +69,11 @@ data Item i = Item
 type Incarnations i = Array Day [Incarnation i]
 type Incarnations' = Array Day [Incarnation']
 
-data Backend i state = Backend
-  { query :: (Day,Day) -> State state (Incarnations i)
-  -- ^ querying a certain day range, return a list of (cached) incarnations
-  , dequeueIO :: state -> Maybe (IO state)
-  , editExternally :: i -> StateT state IO ()
-  -- ^ given the identfier, edit an item externally in an editor
-  , addReminder :: PartialReminder -> StateT state IO ()
-  -- ^ given a partial reminder, add the specified item to the calendar
-  , create :: (String -> Maybe String) -> Either String state
-  -- ^ create a new instance given the config
-  }
-
-data XBackendQuery a = XBackendQuery {
+data BackendQuery a = BackendQuery {
         bqIO :: (IO a)
     }
 
-type XBackendM state event a = StateT state (Writer [XBackendQuery event]) a
+type BackendM state event a = StateT state (Writer [BackendQuery event]) a
 
 -- | tell where the source code of an item can be edited
 data ItemSource event =
@@ -100,10 +88,10 @@ data Event event =
     | AddReminder PartialReminder
     | Response event
 
-data XBackend state event = XBackend
-  { xcreate :: (String -> Maybe String) -> Either String state
+data Backend state event = Backend
+  { create :: (String -> Maybe String) -> Either String state
   , cachedIncarnations :: state -> (Day,Day) -> Incarnations'
-  , handleEvent :: Event event -> XBackendM state event ()
-  , itemSource :: Ptr -> XBackendM state event (ItemSource event)
+  , handleEvent :: Event event -> BackendM state event ()
+  , itemSource :: Ptr -> BackendM state event (ItemSource event)
   }
 

@@ -62,46 +62,6 @@ read_only computation = do
     s <- get
     lift $ runReaderT computation s
 
-static_backend
-    :: Ord i
-    => ((String -> Maybe String) -> Either String config)
-    -- ^ the config loader
-    -> (config -> IO [Item i])
-    -- ^ initialization procedure
-    -> (i -> (FilePath,Int))
-    -- ^ mapping of item ids to files and line numbers
-    -> (PartialReminder -> Reader config (FilePath,String))
-    -- ^ a reminder template
-    -> Backend i (config, Maybe [Item i])
-static_backend configparser initializer item2file remTemplate = Backend
-    { query = (\dayRange -> do
-            items <- gets (fromMaybe [] . snd)
-            return $ query_items items dayRange)
-    , dequeueIO = (\st ->
-            case st of
-                (_, Just _) ->
-                    Nothing
-                (config, Nothing) ->
-                    Just $ return (\x -> (,) config $ Just x) <*> initializer config)
-    , create = fmap (flip (,) Nothing) . configparser
-    , editExternally = (\i ->
-            let (file,line) = item2file i in do
-            lift $ editFileExternally file line
-            st <- gets fst
-            put (st, Nothing) -- discard items to force reload
-        )
-    , addReminder = (\prem -> do
-        (filepath, line) <- mapStateT (return . runIdentity)
-                            $ read_only
-                            $ withReader fst
-                            $ remTemplate prem
-        filepath' <- lift $ expandTilde filepath
-        lift $ appendFile filepath' line
-        config <- gets fst
-        put (config,Nothing) -- force reload
-      )
-    }
-
-callback :: IO event -> XBackendM state event ()
-callback io_action = tell [XBackendQuery $ io_action]
+callback :: IO event -> BackendM state event ()
+callback io_action = tell [BackendQuery $ io_action]
 

@@ -30,8 +30,8 @@ import Control.Concurrent
 
 data RawCalendar stateType eventType = RawCalendar
     { _calState :: stateType
-    , _calBackend :: CB.XBackend stateType eventType
-    , _calOpenQueries :: [CB.XBackendQuery eventType]
+    , _calBackend :: CB.Backend stateType eventType
+    , _calOpenQueries :: [CB.BackendQuery eventType]
     , _calMVarQuery :: MVar (IO eventType)
     , _calMVarResult :: MVar eventType
     , _calWaitingForResult :: Bool
@@ -43,7 +43,7 @@ makeLenses ''RawCalendar
 data Calendar = forall stateType eventType.
         Calendar (RawCalendar stateType eventType)
 
-zoomBackend :: Monad m => (CB.XBackend s q -> CB.XBackendM s q a) -> StateT (RawCalendar s q) m a
+zoomBackend :: Monad m => (CB.Backend s q -> CB.BackendM s q a) -> StateT (RawCalendar s q) m a
 zoomBackend state_action = do
     be <- use calBackend
     st <- use calState
@@ -67,7 +67,7 @@ fromConfig :: IO () -> Conf.CalendarConfig -> Either String (IO Calendar)
 fromConfig noticeDataReady cc = do
     (_,CBR.SomeBackend be) <- maybe (Left $ "No backend named \"" ++ bet ++ "\"") Right $
         find ((==) bet . fst) CBR.backends
-    state <- CB.xcreate be getOption
+    state <- CB.create be getOption
     return $ do
         args <- newEmptyMVar
         results <- newEmptyMVar
@@ -96,7 +96,7 @@ fileQuery = doCalendar $ do
     unless waiting $ do
         case queue of
             [] -> return ()
-            ((CB.XBackendQuery action):queue') -> do
+            ((CB.BackendQuery action):queue') -> do
                 mv <- use calMVarQuery
                 liftIO $ putMVar mv action
                 calWaitingForResult .= True
