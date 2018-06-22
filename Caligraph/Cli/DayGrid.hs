@@ -58,6 +58,7 @@ data RowController = RowController
   , _nextRow :: [Day] -> [Day]
   , _surroundingDays :: Day -> Surrounding Day
   , _dayWidth :: Day -> Int -> Int -- ^ Given full width return a day's width
+  , _tableWidth :: Int -> Int -- ^ given available width return the table's width
   }
 
 makeLenses ''RowController
@@ -83,6 +84,7 @@ weekPerRow = RowController
   , _previousRow = map (addDays (-7))
   , _nextRow     = map (addDays ( 7))
   , _dayWidth = (\d fullwidth -> (fullwidth - 1) `div` 7)
+  , _tableWidth = (\fullwidth -> ((fullwidth - 1) `div` 7) * 7 + 1)
   }
 
 -- | The internal state
@@ -149,11 +151,15 @@ renderHeaderRows = (r, f)
       str [UJ.get UJ.Empty UJ.Strong UJ.Normal UJ.Strong]
     topmiddleBorderWidget =
       str [UJ.get UJ.Empty UJ.Strong UJ.Normal UJ.Strong]
+    topBorderChar =
+      UJ.get UJ.Empty UJ.Strong UJ.Empty UJ.Strong
     toprightBorderWidget =
       str [UJ.get UJ.Empty UJ.Strong UJ.Normal UJ.Strong]
     f (w,h) = (w, h-2)
     r rc day fullwidth =
       let
+        gapLeftWidth = (fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
+        gapLeftWidget c = str $ map (const c) [1..gapLeftWidth]
         cols =
           map (\d ->
                 ( case toWeekDate d of (_,_,d') -> daynames !! (d'-1)
@@ -163,6 +169,7 @@ renderHeaderRows = (r, f)
       in
       [ forceAttr "cellBorder"
         $ hBox
+        $ (gapLeftWidget topBorderChar:)
         $ (flip (++) [toprightBorderWidget <+> UJ.withLineType UJ.Strong hBorder])
         $ map (\(i,(s,w)) ->
               hLimit w $ padRight Max $
@@ -172,6 +179,7 @@ renderHeaderRows = (r, f)
                  <+> UJ.withLineType UJ.Strong hBorder)
         $ zip [0..] cols
       , hBox
+        $ (gapLeftWidget ' ':)
         $ (flip (++) [forceAttr "cellBorder" leftBorderWidget])
         $ map (\(s,w) ->
             hLimit w
@@ -211,6 +219,10 @@ render st =
     headerRows w = (fst renderHeaderRows) rc (st^.focusDay) w
     -- renderRow :: ScreenRow -> Int -> Widget n
     renderRow fullwidth (ScreenRow days height ct cb) =
+      let
+        gapLeftWidth = (fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
+        gapLeftWidget = str $ map (const ' ') [1..gapLeftWidth]
+      in
       days
       & map (\d -> ((rc^.dayWidth) d fullwidth, d))
       & map (\(width,d) -> (width, snd $ renderDay st width d))
@@ -218,6 +230,7 @@ render st =
       & map (\(width,d) -> setAvailableSize (width,height) d)
       & map (cropTopBy ct)
       & map (cropBottomBy cb)
+      & ((:) gapLeftWidget)
       & hBox
 
 -- | call this after this widget has been rendered
