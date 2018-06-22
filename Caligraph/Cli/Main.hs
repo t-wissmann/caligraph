@@ -248,6 +248,7 @@ mainApp =
         , ("cellHeaderFocus", yellow `on` black)
         , ("cellHeaderToday", black `on` yellow)
         , ("cellHeaderFocusToday", black `on` yellow)
+        , ("dayOfWeek", fg magenta)
         , ("statusline", blue `on` black)
         , ("reminderTitle", defAttr)
         , ("reminderTime", Attr (SetTo bold) (SetTo green) KeepCurrent)

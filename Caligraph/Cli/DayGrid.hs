@@ -5,6 +5,7 @@
 module Caligraph.Cli.DayGrid where
 
 import qualified Caligraph.Cli.UnicodeJunction as UnicodeJunction
+import qualified Caligraph.Cli.UnicodeJunction as UJ
 
 import Caligraph.Utils
 import Data.Maybe
@@ -91,7 +92,7 @@ data St n = St
   , _scrollDay :: Day
   , _focusDay :: Day
   , _today :: Day
-  , _size :: Maybe (Int,Int)
+  , _size :: Maybe (Int,Int) -- size of the area for the actual days (without header!)
   , _day2widget :: Day -> (DayWidget n)
   , _dayCache :: Map Day (DayWidget n)
   , _rowController :: RowController
@@ -126,6 +127,64 @@ getToday = do
   tz <- getCurrentTimeZone
   return $ localDay $ utcToLocalTime tz g
 
+
+-- | reander the header rows
+renderHeaderRows
+  :: (RowController
+  -- ^ the row controller
+  -> Day
+  -- ^ the currently selected day
+  -> Int
+  -- ^ the width
+  -> [Widget n]
+  -- ^ a list of header rows
+  , (Int,Int) -> (Int,Int))
+  -- ^ how the header affects the widget size
+renderHeaderRows = (r, f)
+  where
+    daynames = ["Mo", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    leftBorderWidget =
+      str [UJ.get UJ.Normal UJ.Empty UJ.Normal UJ.Empty]
+    topleftBorderWidget =
+      str [UJ.get UJ.Empty UJ.Strong UJ.Normal UJ.Strong]
+    topmiddleBorderWidget =
+      str [UJ.get UJ.Empty UJ.Strong UJ.Normal UJ.Strong]
+    toprightBorderWidget =
+      str [UJ.get UJ.Empty UJ.Strong UJ.Normal UJ.Strong]
+    f (w,h) = (w, h-2)
+    r rc day fullwidth =
+      let
+        cols =
+          map (\d ->
+                ( case toWeekDate d of (_,_,d') -> daynames !! (d'-1)
+                , (rc^.dayWidth) d fullwidth
+                ))
+          $ (rc^.rowOf) day -- the days
+      in
+      [ forceAttr "cellBorder"
+        $ hBox
+        $ (flip (++) [toprightBorderWidget <+> UJ.withLineType UJ.Strong hBorder])
+        $ map (\(i,(s,w)) ->
+              hLimit w $ padRight Max $
+                (if i == 0
+                 then topleftBorderWidget
+                 else topmiddleBorderWidget)
+                 <+> UJ.withLineType UJ.Strong hBorder)
+        $ zip [0..] cols
+      , hBox
+        $ (flip (++) [forceAttr "cellBorder" leftBorderWidget])
+        $ map (\(s,w) ->
+            hLimit w
+              $ padRight Max
+              $ forceAttr "cellBorder" leftBorderWidget
+              <+> forceAttr "dayOfWeek" (txt s)
+        ) cols
+      ]
+
+
+
+
+
 -- | render the calendar
 render :: (Ord n, Show n)
   => St n
@@ -140,13 +199,17 @@ render st =
     mapHead _ [] = []
     mapHead f (x:xs) = (f x:xs)
     render' = do
-      fullwidth <- asks (view availWidthL)
-      height <- asks (view availHeightL)
+      w' <- asks (view availWidthL)
+      h' <- asks (view availHeightL)
+      let (fullwidth,height) = snd renderHeaderRows (w',h')
       Brick.Types.render $
         computeVisibleRows st (fullwidth,height)
         & map (renderRow fullwidth)
+        & ((++) $ headerRows fullwidth)
         & vBox
-    -- renderRow :: ScreenRow -> Int -> Widget ''n
+    headerRows :: Int -> [Widget n]
+    headerRows w = (fst renderHeaderRows) rc (st^.focusDay) w
+    -- renderRow :: ScreenRow -> Int -> Widget n
     renderRow fullwidth (ScreenRow days height ct cb) =
       days
       & map (\d -> ((rc^.dayWidth) d fullwidth, d))
@@ -165,7 +228,7 @@ updateWidgetSize st = do
     Nothing -> return st
     Just (Extent _ _ lastsize _) ->
       st
-      & size .~ Just lastsize
+      & size .~ Just ((snd renderHeaderRows) lastsize)
       & return
 
 computeVisibleRows
@@ -407,7 +470,7 @@ scrollPage pages st =
 
 resize :: (Int,Int) -> St n -> St n
 resize (w,h) s = s
-    & size .~ Just (w,h)
+    & size .~ Just (snd renderHeaderRows (w,h))
     & normalizeScrollDay
     -- & computeVisibleRows
     -- & scrollToFocus
