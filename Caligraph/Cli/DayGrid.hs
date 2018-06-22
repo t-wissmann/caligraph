@@ -155,6 +155,12 @@ init
 init n d =
   St n 0 d d d Nothing (const emptyDay) M.empty weekPerRow
 
+widthToRowController :: Int -> RowController
+widthToRowController w =
+  if w < 90
+  then halfweekPerRow
+  else weekPerRow
+
 getToday :: IO Day
       -- ^ today in the current time zone
 getToday = do
@@ -178,52 +184,24 @@ renderHeaderRows
 renderHeaderRows = (r, f)
   where
     daynames = ["Mo", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    leftBorderWidget =
-      str [UJ.get UJ.Normal UJ.Empty UJ.Normal UJ.Empty]
-    topleftBorderWidget =
-      str [UJ.get UJ.Empty UJ.Strong UJ.Normal UJ.Strong]
-    topmiddleBorderWidget =
-      str [UJ.get UJ.Empty UJ.Strong UJ.Normal UJ.Strong]
-    topBorderChar =
-      UJ.get UJ.Empty UJ.Strong UJ.Empty UJ.Strong
-    toprightBorderWidget =
-      str [UJ.get UJ.Empty UJ.Strong UJ.Normal UJ.Strong]
-    f (w,h) = (w, h-2)
+    f (w,h) = (w, h-1)
     r rc day fullwidth =
       let
         gapLeftWidth = (fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
         gapLeftWidget c = str $ map (const c) [1..gapLeftWidth]
-        cols =
-          map (\d ->
+      in
+      [ forceAttr "dayOfWeek"
+        $ hBox
+        $ (flip (++) [fill ' '])
+        $ (gapLeftWidget ' ':)
+        $ map (\(s,w) ->
+            hLimit w $ hBox [str " ", fill ' ', str s, fill ' '])
+        $ map (\d ->
                 ( case toWeekDate d of (_,_,d') -> daynames !! (d'-1)
                 , (rc^.dayWidth) d fullwidth
                 ))
-          $ (rc^.rowOf) day -- the days
-      in
-      [ forceAttr "cellBorder"
-        $ hBox
-        $ (gapLeftWidget topBorderChar:)
-        $ (flip (++) [toprightBorderWidget <+> UJ.withLineType UJ.Strong hBorder])
-        $ map (\(i,(s,w)) ->
-              hLimit w $ padRight Max $
-                (if i == 0
-                 then topleftBorderWidget
-                 else topmiddleBorderWidget)
-                 <+> UJ.withLineType UJ.Strong hBorder)
-        $ zip [0..] cols
-      , hBox
-        $ (gapLeftWidget ' ':)
-        $ (flip (++) [forceAttr "cellBorder" leftBorderWidget])
-        $ map (\(s,w) ->
-            hLimit w
-              $ padRight Max
-              $ forceAttr "cellBorder" leftBorderWidget
-              <+> forceAttr "dayOfWeek" (txt s)
-        ) cols
+        $ (rc^.rowOf) day -- the days
       ]
-
-
-
 
 
 -- | render the calendar
@@ -236,9 +214,9 @@ render st =
   reportExtent (st^.widgetName) $
   Widget Greedy Greedy render'
   where
-    rc = (st^.rowController)
     mapHead _ [] = []
     mapHead f (x:xs) = (f x:xs)
+    rc = (st^.rowController)
     render' = do
       w' <- asks (view availWidthL)
       h' <- asks (view availHeightL)
@@ -249,12 +227,13 @@ render st =
         & ((++) $ headerRows fullwidth)
         & vBox
     headerRows :: Int -> [Widget n]
-    headerRows w = (fst renderHeaderRows) rc (st^.focusDay) w
+    headerRows w = (fst renderHeaderRows) (st^.rowController) (st^.focusDay) w
     -- renderRow :: ScreenRow -> Int -> Widget n
     renderRow fullwidth (ScreenRow days height ct cb) =
       let
         gapLeftWidth = (fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
         gapLeftWidget = str $ map (const ' ') [1..gapLeftWidth]
+        -- render the empty space at the end of shorter rows
         renderEmptySpace renderedDays =
           if length days == (rc^.columns)
           then renderedDays
@@ -267,6 +246,7 @@ render st =
             in
             renderedDays ++
               [ (w, forceAttr "cellBorder" $
+                      padBottom Max $
                       UJ.withLineType bs hBorder
                       <+> str [UJ.get bs UJ.Empty UJ.Empty bs])]
       in
@@ -532,6 +512,7 @@ scrollPage pages st =
 resize :: (Int,Int) -> St n -> St n
 resize (w,h) s = s
     & size .~ Just (snd renderHeaderRows (w,h))
+    & rowController .~ (widthToRowController w)
     & normalizeScrollDay
     -- & computeVisibleRows
     -- & scrollToFocus
