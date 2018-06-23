@@ -187,7 +187,8 @@ renderHeaderRows = (r, f)
     f (w,h) = (w, h-1)
     r rc day fullwidth =
       let
-        gapLeftWidth = (fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
+        -- if in doubt, have more gap on the left
+        gapLeftWidth = (1 + fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
         gapLeftWidget c = str $ map (const c) [1..gapLeftWidth]
       in
       [ forceAttr "dayOfWeek"
@@ -231,7 +232,8 @@ render st =
     -- renderRow :: ScreenRow -> Int -> Widget n
     renderRow fullwidth (ScreenRow days height ct cb) =
       let
-        gapLeftWidth = (fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
+        -- if in doubt, have more gap on the left
+        gapLeftWidth = (1 + fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
         gapLeftWidget = str $ map (const ' ') [1..gapLeftWidth]
         -- render the empty space at the end of shorter rows
         renderEmptySpace renderedDays =
