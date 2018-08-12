@@ -123,7 +123,6 @@ binds = Map.fromList
   [ (([], KEsc), quit_cmd)
   , (([], KChar 'q'), quit_cmd)
   , (([], KChar 'e'), edit_externally_cmd)
-  , (([MShift], KChar 'a'), add_reminder_cmd')
   , (([], KChar 'a'), add_reminder_cmd)
   , (([], KChar 'o'), dayGrid %= DayGrid.gotoToday)
 
@@ -192,12 +191,6 @@ edit_externally_cmd = do
 add_reminder_cmd :: Cmd St
 add_reminder_cmd =
     mode .= AMAppend
-
-add_reminder_cmd' :: Cmd St
-add_reminder_cmd' = do
-    day <- use (dayGrid . DayGrid.focusDay)
-    let title = "New Reminder"
-    zoom calendar $ embed $ CC.addReminder $ CB.PartialReminder day title Nothing Nothing Nothing
 
 addReminderFromString :: String -> Cmd St
 addReminderFromString title = do
