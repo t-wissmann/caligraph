@@ -9,6 +9,7 @@ import Brick.BChan
 import Brick.Widgets.Core (withAttr,vBox,(<+>))
 import Brick.AttrMap (attrMap, AttrMap)
 import Brick.Widgets.Border.Style
+import Brick.Widgets.Edit as Brick
 import qualified Brick.Types as BT
 
 import Caligraph.Cli.Types
@@ -122,6 +123,7 @@ binds = Map.fromList
   [ (([], KEsc), quit_cmd)
   , (([], KChar 'q'), quit_cmd)
   , (([], KChar 'e'), edit_externally_cmd)
+  , (([MShift], KChar 'a'), add_reminder_cmd')
   , (([], KChar 'a'), add_reminder_cmd)
   , (([], KChar 'o'), dayGrid %= DayGrid.gotoToday)
 
@@ -188,9 +190,18 @@ edit_externally_cmd = do
     else return ()
 
 add_reminder_cmd :: Cmd St
-add_reminder_cmd = do
+add_reminder_cmd =
+    mode .= AMAppend
+
+add_reminder_cmd' :: Cmd St
+add_reminder_cmd' = do
     day <- use (dayGrid . DayGrid.focusDay)
     let title = "New Reminder"
+    zoom calendar $ embed $ CC.addReminder $ CB.PartialReminder day title Nothing Nothing Nothing
+
+addReminderFromString :: String -> Cmd St
+addReminderFromString title = do
+    day <- use (dayGrid . DayGrid.focusDay)
     zoom calendar $ embed $ CC.addReminder $ CB.PartialReminder day title Nothing Nothing Nothing
 
 fileIOQueries :: MonadIO io => StateT St io ()
@@ -253,6 +264,7 @@ mainApp =
         , ("reminderTitle", defAttr)
         , ("reminderTime", Attr (SetTo bold) (SetTo green) KeepCurrent)
         , ("selectedReminderTitle", bg black)
+        , (Brick.editFocusedAttr, bg black)
         , ("selectedReminderTime", Attr (SetTo bold) (SetTo green) (SetTo black))
         ]
       }
@@ -265,30 +277,48 @@ continueOrHalt s =
     then halt s
     else continue s
 
+execCmd :: St -> Cmd St -> EventM WidgetName (Next St)
+execCmd s cmd =
+    let Breakpoint io_action = runStateT (do cmd ; fileIOQueries) s in
+    do
+        possibly_io <- liftIO $ io_action
+        case possibly_io of
+            Pure ((),s') ->
+                continueOrHalt (updateDayRange s')
+            Monadic fg_io_action ->
+                suspendAndResume $
+                    fmap (updateDayRange . snd) fg_io_action
+
 myHandleEvent :: St -> BrickEvent WidgetName ExternalEvent -> EventM WidgetName (Next St)
 myHandleEvent s (VtyEvent e) =
-  case e of
-    EvKey key mods ->
-      case Map.lookup (mods,key) binds of
-        Just cmd ->
-            let Breakpoint io_action = runStateT (do cmd ; fileIOQueries) s in
-            do
-                possibly_io <- liftIO $ io_action
-                case possibly_io of
-                    Pure ((),s') ->
-                        continueOrHalt (updateDayRange s')
-                    Monadic fg_io_action ->
-                        suspendAndResume $
-                            fmap (updateDayRange . snd) fg_io_action
-        Nothing -> continue (updateDayRange s)
-    EvResize w h ->
-      continue (s & dayGrid %~ DayGrid.resize (w,h) & updateDayRange)
-    EvMouseDown _ _ BScrollDown _ ->
-      continue (s & dayGrid %~ DayGrid.scroll scrollStep & updateDayRange)
-    EvMouseDown _ _ BScrollUp _ ->
-      continue (s & dayGrid %~ DayGrid.scroll (-scrollStep) & updateDayRange)
-    _ ->
-      continue s
+  case (s^.mode) of
+    AMAppend ->
+      case e of
+        EvKey KEsc [] ->
+            continue (s & mode .~ AMNormal & updateDayRange)
+        EvKey KEnter [] ->
+            execCmd s $ do
+                editor <- use newReminderEditor
+                newReminderEditor .= emptyReminderEditor
+                mode .= AMNormal
+                addReminderFromString (head (getEditContents editor))
+        _ ->
+            continue =<< fmap updateDayRange (handleEventLensed s newReminderEditor Brick.handleEditorEvent e)
+    AMNormal ->
+      case e of
+        EvKey key mods ->
+          case Map.lookup (mods,key) binds of
+            Just cmd ->
+                execCmd s cmd
+            Nothing -> continue (updateDayRange s)
+        EvResize w h ->
+          continue (s & dayGrid %~ DayGrid.resize (w,h) & updateDayRange)
+        EvMouseDown _ _ BScrollDown _ ->
+          continue (s & dayGrid %~ DayGrid.scroll scrollStep & updateDayRange)
+        EvMouseDown _ _ BScrollUp _ ->
+          continue (s & dayGrid %~ DayGrid.scroll (-scrollStep) & updateDayRange)
+        _ ->
+          continue s
 myHandleEvent s (AppEvent ev) =
     case ev of
         CalendarIO -> do
@@ -319,19 +349,24 @@ day2widget :: St -> Day -> DayWidget WidgetName
 day2widget st day =
     DayWidget.day2widget
         (DayWidget.St
-            (if focus == day
+            (if focus == day && (st^.mode) == AMNormal
               then Just $ fromMaybe (length reminders - 1) (st^.focusItem)
               else Nothing)
             reminders
             day
-            today)
+            today
+            (case (st^.mode, focus==day) of
+                (AMAppend,True) -> Just (st^.newReminderEditor)
+                _ -> Nothing))
     where
       today = st^.dayGrid^.DayGrid.today
       focus = st^.dayGrid^.DayGrid.focusDay
       reminders = L.sort (fromMaybe [] $ safeArray (st^.visibleIncarnations) day)
 
 updateDayRange :: St -> St
-updateDayRange = execState $ updateDayRange' False
+updateDayRange = execState $ do
+    m <- use mode
+    updateDayRange' (m == AMAppend)
 
 updateDayRange' :: Monad m => Bool -> StateT St m ()
 updateDayRange' force = do
@@ -348,6 +383,10 @@ updateDayRange' force = do
          visibleIncarnations .= CC.cachedIncarnations c day_range
     s <- get
     dayGrid %= (DayGrid.resizeDays $ day2widget s)
+
+emptyReminderEditor :: Brick.Editor String WidgetName
+emptyReminderEditor =
+    (Brick.editor WNNewReminder (Just 1) "")
 
 testmain :: IO ()
 testmain = do
@@ -372,7 +411,10 @@ testmain = do
         (array (today,addDays (-1) today) [])
         (Just 0)
         cal_loaded
-        log)
+        log
+        AMNormal
+        emptyReminderEditor
+        )
   return ()
 
 rightOrDie :: Either String a -> IO a

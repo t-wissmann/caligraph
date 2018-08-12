@@ -13,6 +13,7 @@ import Brick.Main
 import Brick.Widgets.Core (withAttr,vBox,(<+>))
 import Brick.AttrMap (attrMap, AttrMap)
 import Brick.Widgets.Center (hCenter)
+import qualified Brick.Widgets.Edit as Brick
 
 import qualified Graphics.Vty as V
 import Data.Time.Calendar
@@ -30,6 +31,7 @@ data St = St
     , reminders :: [CB.Incarnation']
     , day :: Day
     , today :: Day
+    , newReminderEditor :: Maybe (Brick.Editor String WidgetName)
     }
 
 
@@ -135,6 +137,9 @@ day2widget st width =
     & zipWith (\i d -> widget i d width) [0..]
     & intersperse (1, str $ replicate width ' ') -- put empty lines in between
     & (if (null $ reminders st) then (:) focusIndicator else id)
+    & (case (newReminderEditor st) of
+        Just e -> (\x-> (1, (Brick.renderEditor (str . head) True e)):(1,str " "):x)
+        Nothing -> id)
     & (:) (1, str $ replicate width ' ') -- put an empty line below header
     & (:) headerWidget -- prepend header
     & flip (++) [(0, fixedfill ' ')] -- we do this to have empty space clickable

@@ -11,6 +11,7 @@ data WidgetName =
     WNDayGrid
     | WNDay Day
     | WNDayItem Day Int
+    | WNNewReminder
     deriving (Ord,Eq,Show)
 
 -- | the type of a day widget
