@@ -9,6 +9,7 @@ import Data.Array as A
 import Data.Maybe
 
 import Control.Monad.State
+import Control.Monad.Reader
 import Control.Monad.Identity
 
 lastSafe :: [a] -> Maybe a
@@ -59,6 +60,11 @@ editFileExternally filepath line = do
 
 embed :: Monad m => State s r -> StateT s m r
 embed = mapStateT (return . runIdentity)
+
+readOnly :: Monad m => ReaderT s m r -> StateT s m r
+readOnly r = do
+    s <- get
+    lift $ runReaderT r s
 
 mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f (Left b) = Left $ f b

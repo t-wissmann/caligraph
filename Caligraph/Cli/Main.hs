@@ -28,6 +28,7 @@ import qualified Caligraph.Calendar as CC
 import Control.Monad (when)
 import Control.Monad.State
 import Control.Monad.Writer.Lazy
+import Control.Monad.Reader
 import Control.Monad.IO.Class (liftIO)
 import Data.Array
 import Data.Maybe
@@ -155,7 +156,7 @@ quit_cmd =
 focus_cmd :: Dir -> Cmd St
 focus_cmd dir = do
     focus <- use $ dayGrid . DayGrid.focusDay
-    reminders <- getReminders focus
+    reminders <- readOnly $ getReminders focus
     fi <- use focusItem
     let focusItemConcrete = case fi of
                             Nothing -> length reminders - 1
@@ -184,7 +185,7 @@ focus_cmd dir = do
 edit_externally_cmd :: Cmd St
 edit_externally_cmd = do
     day <- use (dayGrid . DayGrid.focusDay)
-    rems <- getReminders day
+    rems <- readOnly $ getReminders day
     idx <- fmap (fromMaybe $ length rems - 1) $ use focusItem
     if idx >= 0 && idx < length rems
     then do
@@ -218,7 +219,7 @@ fixFocusItem :: Monad m => StateT St m ()
 fixFocusItem = do
     updateDayRange' True
     day <- use $ dayGrid . DayGrid.focusDay
-    reminders <- getReminders day
+    reminders <- readOnly $ getReminders day
     focusItem %= fmap (min $ length reminders - 1)
 
 footer_height = 2
@@ -237,15 +238,14 @@ drawUI st =
           AMNormal ->
             fromMaybe "" $ listToMaybe (st^.messages)
 
-getReminders :: Monad m => Day -> StateT St m [CB.Incarnation']
-getReminders day = do
-    visibInc <- use visibleIncarnations
-    return $ L.sort $ fromMaybe [] $ safeArray visibInc day
-    --cals <- use calendars
-    --incs <- forM cals (\(_,c) ->
-    --    return $ fromMaybe []
-    --           $ safeArray (CC.cachedIncarnations c (addDays (-8) day, addDays 8 day)) day)
-    --return $ L.sort $ concat incs
+getReminders :: Monad m => Day -> ReaderT St m [CB.Incarnation']
+getReminders day =
+    do
+    cals <- asks _calendars
+    incs <- forM cals (\(_,c) ->
+        return $ fromMaybe []
+               $ safeArray (CC.cachedIncarnations c (day,day)) day)
+    return $ L.sort $ concat incs
 
 tryEnableMouse :: EventM WidgetName ()
 tryEnableMouse = do
@@ -344,8 +344,6 @@ myHandleEvent s (AppEvent ev) =
                     Just m -> messages %= (:) m
                     Nothing -> return ()
                 c <- use (calendar_idx idx)
-                incs <- use visibleIncarnations
-                visibleIncarnations .= CC.cachedIncarnations c (bounds incs)
                 s'' <- get
                 dayGrid %= (DayGrid.resizeDays $ day2widget s'')
             continue s'
@@ -376,7 +374,7 @@ day2widget st day =
     where
       today = st^.dayGrid^.DayGrid.today
       focus = st^.dayGrid^.DayGrid.focusDay
-      reminders = L.sort (fromMaybe [] $ safeArray (st^.visibleIncarnations) day)
+      reminders = runReader (getReminders day) st
 
 updateDayRange :: St -> St
 updateDayRange = execState $ do
@@ -387,15 +385,8 @@ updateDayRange' :: Monad m => Bool -> StateT St m ()
 updateDayRange' force = do
     -- get currently visible day range
     day_range <- fmap DayGrid.rangeVisible $ use dayGrid
-
-    incs <- use visibleIncarnations
-    if (day_range == bounds incs) && not force
-       then return ()
-       else do
-         -- report it to the calendar
-         zoom (calendar_idx 0) $ embed $ CC.setRangeVisible day_range
-         c <- use (calendar_idx 0)
-         visibleIncarnations .= CC.cachedIncarnations c day_range
+    zoom (calendar_idx 0) $ embed $ CC.setRangeVisible day_range
+    -- TODO: why do we need this here?
     s <- get
     dayGrid %= (DayGrid.resizeDays $ day2widget s)
 
@@ -429,7 +420,6 @@ testmain = do
     (AppState
         False
         day_grid
-        (array (today,addDays (-1) today) [])
         (Just 0)
         cals_loaded
         (mapMaybe id log)
