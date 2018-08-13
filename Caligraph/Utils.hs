@@ -60,3 +60,7 @@ editFileExternally filepath line = do
 embed :: Monad m => State s r -> StateT s m r
 embed = mapStateT (return . runIdentity)
 
+mapLeft :: (a -> c) -> Either a b -> Either c b
+mapLeft f (Left b) = Left $ f b
+mapLeft _ (Right b) = Right b
+

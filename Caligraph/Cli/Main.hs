@@ -19,7 +19,8 @@ import qualified Caligraph.Cli.DayWidget as DayWidget
 
 import Caligraph.Utils
 import Caligraph.Possibly
-import qualified Caligraph.Config.Calendars as Config
+import qualified Caligraph.Config.Main as MainConfig
+import qualified Caligraph.Config.Calendars as CalendarConfig
 import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
 import qualified Caligraph.Calendar as CC
@@ -43,8 +44,9 @@ import Graphics.Vty.Input.Events
 import Graphics.Vty (outputIface)
 import Graphics.Vty.Output.Interface (supportsMode,Mode(Mouse),setMode)
 import qualified Data.Map.Strict as Map
+import qualified Data.HashMap.Strict as HashMap
 import System.Exit
-import System.Environment (getArgs)
+import System.Environment (getArgs,setEnv)
 
 import Debug.Trace
 
@@ -216,13 +218,21 @@ fixFocusItem = do
     reminders <- getReminders day
     focusItem %= fmap (min $ length reminders - 1)
 
-ui st =
-  [DayGrid.render (st^.dayGrid) <=> footer]
+footer_height = 2
+
+drawUI st =
+  [DayGrid.render (st^.dayGrid) <=> status_line <=> input_line]
   where
-    footer = withAttr "statusline"
-        $ vBox
-        $ map (padRight BT.Max . str)
-        $ reverse $ take 5 (st^.messages)
+    status_line = withAttr "statusline"
+        $ (padRight BT.Max $ str "To be done")
+    input_line = withAttr "inputline"
+      $ padRight BT.Max
+      $ str
+      $ case (st^.mode) of
+          AMAppend ->
+            "-- INSERT --"
+          AMNormal ->
+            fromMaybe "" $ listToMaybe (st^.messages)
 
 getReminders :: Monad m => Day -> StateT St m [CB.Incarnation']
 getReminders day = do
@@ -241,7 +251,7 @@ tryEnableMouse = do
 
 mainApp :: App St ExternalEvent WidgetName
 mainApp =
-  App { appDraw = ui
+  App { appDraw = drawUI
       , appChooseCursor = showFirstCursor
       , appHandleEvent = (\s ev ->
             do
@@ -393,7 +403,10 @@ testmain = do
         return v
   today <- DayGrid.getToday
   args <- getArgs
-  raw_calendars <- Config.load >>= rightOrDie
+  config <- MainConfig.load >>= rightOrDie
+  forM_ (HashMap.toList $ MainConfig.environment config) (\(k,v) ->
+    setEnv (T.unpack k) (T.unpack v))
+  raw_calendars <- CalendarConfig.load >>= rightOrDie
   chan <- newBChan (1 + length raw_calendars)
   cal <- rightOrDie $ CC.fromConfig (writeBChan chan CalendarIO) (snd $ raw_calendars !! 0)
   cal' <- cal

@@ -1,6 +1,8 @@
 module Caligraph.Config.Calendars where
 
+import Caligraph.Config.Main
 import Data.HashMap.Strict as M
+import Caligraph.Utils (mapLeft)
 
 import Data.Text
 import Data.Text.IO as T
@@ -27,11 +29,7 @@ load = do
         return ((,) a) <*> parseCalendar b
 
 
-mapLeft :: (a -> c) -> Either a b -> Either c b
-mapLeft f (Left b) = Left $ f b
-mapLeft _ (Right b) = Right b
-
-parseCalendar :: HashMap Text Text -> Either String CalendarConfig
+parseCalendar :: SectionParser CalendarConfig
 parseCalendar section =
     return CalendarConfig <*> f "type" <*> pure section
     where f = field section
