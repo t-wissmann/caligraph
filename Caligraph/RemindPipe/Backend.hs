@@ -67,8 +67,11 @@ monthRange (year,m) =
     , addDays (-1) $ fromGregorian year' m' 1
     )
 
+-- | return a list of months in the given range
 monthsCovered :: (Day,Day) -> [Month]
-monthsCovered (from,to) = [(from_y,from_m)] ++ months_in_between ++ [(to_y,to_m)]
+monthsCovered (from,to) =
+  map head $ group $
+  [(from_y,from_m)] ++ months_in_between ++ [(to_y,to_m)]
   where
     (from_y,from_m,_) = toGregorian from
     (to_y,to_m,_) = toGregorian to
