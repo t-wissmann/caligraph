@@ -287,34 +287,34 @@ execCmd s cmd =
 
 myHandleEvent :: St -> BrickEvent WidgetName ExternalEvent -> EventM WidgetName (Next St)
 myHandleEvent s (VtyEvent e) =
-  case (s^.mode) of
-    AMAppend ->
-      case e of
-        EvKey KEsc [] ->
-            continue (s & mode .~ AMNormal & updateDayRange)
-        EvKey KEnter [] ->
-            execCmd s $ do
-                editor <- use newReminderEditor
-                newReminderEditor .= emptyReminderEditor
-                mode .= AMNormal
-                addReminderFromString (head (getEditContents editor))
-        _ ->
-            continue =<< fmap updateDayRange (handleEventLensed s newReminderEditor Brick.handleEditorEvent e)
-    AMNormal ->
-      case e of
-        EvKey key mods ->
+  case e of
+    EvKey key mods ->
+      case (s^.mode) of
+        AMAppend ->
+          case (key,mods) of
+            (KEsc,[]) ->
+              continue (s & mode .~ AMNormal & updateDayRange)
+            (KEnter,[]) ->
+              execCmd s $ do
+                  editor <- use newReminderEditor
+                  newReminderEditor .= emptyReminderEditor
+                  mode .= AMNormal
+                  addReminderFromString (head (getEditContents editor))
+            _ ->
+              continue =<< fmap updateDayRange (handleEventLensed s newReminderEditor Brick.handleEditorEvent (EvKey key mods))
+        AMNormal ->
           case Map.lookup (mods,key) binds of
             Just cmd ->
                 execCmd s cmd
             Nothing -> continue (updateDayRange s)
-        EvResize w h ->
-          continue (s & dayGrid %~ DayGrid.resize (w,h) & updateDayRange)
-        EvMouseDown _ _ BScrollDown _ ->
-          continue (s & dayGrid %~ DayGrid.scroll scrollStep & updateDayRange)
-        EvMouseDown _ _ BScrollUp _ ->
-          continue (s & dayGrid %~ DayGrid.scroll (-scrollStep) & updateDayRange)
-        _ ->
-          continue s
+    EvResize w h ->
+      continue (s & dayGrid %~ DayGrid.resize (w,h) & updateDayRange)
+    EvMouseDown _ _ BScrollDown _ ->
+      continue (s & dayGrid %~ DayGrid.scroll scrollStep & updateDayRange)
+    EvMouseDown _ _ BScrollUp _ ->
+      continue (s & dayGrid %~ DayGrid.scroll (-scrollStep) & updateDayRange)
+    _ ->
+      continue s
 myHandleEvent s (AppEvent ev) =
     case ev of
         CalendarIO -> do
