@@ -55,7 +55,9 @@ import Lens.Micro.Mtl
 
 type St =  Caligraph.Cli.AppState.AppState
 
-data ExternalEvent = CalendarIO
+data ExternalEvent =
+    CalendarIO Int
+    -- ^ a calendar io for the i'th calendar
 
 data CmdOutput = CmdOutput
     { cmdoutStderr :: [String]
@@ -188,7 +190,7 @@ edit_externally_cmd = do
     then do
         let p = CB.itemId $ rems !! idx
         requestSuspendGui
-        zoom calendar $ CC.editExternally p
+        zoom (calendar_idx 0) $ CC.editExternally p
     else return ()
 
 add_reminder_cmd :: Cmd St
@@ -201,11 +203,12 @@ addReminderFromString buf = do
     day <- use (dayGrid . DayGrid.focusDay)
     let (from,duration,title) = CB.parseTimeDuration buf
     let pr = CB.PartialReminder day title from duration Nothing
-    zoom calendar $ embed $ CC.addReminder $ pr
+    zoom (calendar_idx 0) $ embed $ CC.addReminder $ pr
 
 fileIOQueries :: MonadIO io => StateT St io ()
-fileIOQueries = do
-    log <- zoom calendar $ CC.fileQuery
+fileIOQueries =
+    do
+    log <- zoom (calendar_idx 0) $ CC.fileQuery
     case log of
         Just m -> messages %= (:) m
         Nothing -> return ()
@@ -238,6 +241,11 @@ getReminders :: Monad m => Day -> StateT St m [CB.Incarnation']
 getReminders day = do
     visibInc <- use visibleIncarnations
     return $ L.sort $ fromMaybe [] $ safeArray visibInc day
+    --cals <- use calendars
+    --incs <- forM cals (\(_,c) ->
+    --    return $ fromMaybe []
+    --           $ safeArray (CC.cachedIncarnations c (addDays (-8) day, addDays 8 day)) day)
+    --return $ L.sort $ concat incs
 
 tryEnableMouse :: EventM WidgetName ()
 tryEnableMouse = do
@@ -328,14 +336,14 @@ myHandleEvent s (VtyEvent e) =
       continue s
 myHandleEvent s (AppEvent ev) =
     case ev of
-        CalendarIO -> do
+        CalendarIO idx -> do
             s' <- flip execStateT s $ do
-                zoom calendar CC.receiveResult
-                log <- zoom calendar $ CC.fileQuery
+                zoom (calendar_idx idx) CC.receiveResult
+                log <- zoom (calendar_idx idx) $ CC.fileQuery
                 case log of
                     Just m -> messages %= (:) m
                     Nothing -> return ()
-                c <- use calendar
+                c <- use (calendar_idx idx)
                 incs <- use visibleIncarnations
                 visibleIncarnations .= CC.cachedIncarnations c (bounds incs)
                 s'' <- get
@@ -385,8 +393,8 @@ updateDayRange' force = do
        then return ()
        else do
          -- report it to the calendar
-         zoom calendar $ embed $ CC.setRangeVisible day_range
-         c <- use calendar
+         zoom (calendar_idx 0) $ embed $ CC.setRangeVisible day_range
+         c <- use (calendar_idx 0)
          visibleIncarnations .= CC.cachedIncarnations c day_range
     s <- get
     dayGrid %= (DayGrid.resizeDays $ day2widget s)
@@ -408,20 +416,23 @@ testmain = do
     setEnv (T.unpack k) (T.unpack v))
   raw_calendars <- CalendarConfig.load >>= rightOrDie
   chan <- newBChan (1 + length raw_calendars)
-  cal <- rightOrDie $ CC.fromConfig (writeBChan chan CalendarIO) (snd $ raw_calendars !! 0)
-  cal' <- cal
   let day_grid = (DayGrid.init WNDayGrid today)
   let day_range = DayGrid.rangeVisible day_grid
-  (msg, cal_loaded) <- runStateT (do embed (CC.setRangeVisible day_range); CC.fileQuery) cal'
-  let log = maybeToList msg
+  (log,cals_loaded) <- fmap unzip $ forM (zip [0..] raw_calendars) (\(i,(t,raw_c)) ->
+    do
+    cal <- rightOrDie $ CC.fromConfig (writeBChan chan (CalendarIO i)) raw_c
+    cal' <- cal
+    (msg, cal'') <- runStateT (do embed (CC.setRangeVisible day_range); CC.fileQuery) cal'
+    return (msg, (t,cal''))
+    )
   customMain buildVty (Just chan) mainApp
     (AppState
         False
         day_grid
         (array (today,addDays (-1) today) [])
         (Just 0)
-        cal_loaded
-        log
+        cals_loaded
+        (mapMaybe id log)
         AMNormal
         emptyReminderEditor
         )

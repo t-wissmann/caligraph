@@ -10,6 +10,7 @@ import qualified Brick.Widgets.Edit as Brick
 
 import Data.Array
 import Data.Time.Calendar (Day)
+import Data.Text (Text)
 
 import Lens.Micro
 import Lens.Micro.TH
@@ -25,10 +26,24 @@ data AppState = AppState
     , _dayGrid :: DayGrid.St WidgetName
     , _visibleIncarnations :: Array Day [CB.Incarnation']
     , _focusItem :: Maybe Int -- the item focused within a day, Nothing means 'the last'
-    , _calendar :: Calendar.Calendar
+    , _calendars :: [(Text,Calendar.Calendar)]
     , _messages :: [LogLine]
     , _mode :: AppMode
     , _newReminderEditor :: Brick.Editor String WidgetName
     }
 
 makeLenses ''AppState
+
+-- | a lens for accessing a calendar by its index
+calendar_idx :: Functor f => Int -> (Calendar.Calendar -> f Calendar.Calendar) -> AppState -> f AppState
+calendar_idx idx f st =
+    fmap (\newCalendar ->
+        st { _calendars =
+                map (changer newCalendar) (zip [0..] $ _calendars st) })
+        $ f $ snd $ (_calendars st) !! idx
+    where
+        changer :: (Eq n, Num n) => a -> (n,(b,a)) -> (b,a)
+        changer newCal (i,(b,a)) =
+            if i == fromIntegral idx
+            then (b,newCal)
+            else (b,a)
