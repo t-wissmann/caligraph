@@ -16,6 +16,7 @@ import Control.Monad.Writer (tell)
 import System.FilePath
 
 import Text.Printf
+import Text.ParserCombinators.Parsec
 import Data.Ord
 import Data.Maybe
 import Data.Array
@@ -64,4 +65,53 @@ read_only computation = do
 
 callback :: String -> IO event -> BackendM state event ()
 callback txt io_action = tell [BackendQuery txt io_action]
+
+parseNonNegative :: (Read a, Num a) => GenParser Char st a
+parseNonNegative = read <$> many1 digit
+
+tryParseTime
+    :: String
+    -- ^ a string to parse
+    -> Maybe (Int,Int)
+    -- ^ maybe a time. the second component is in the range [0,59]
+tryParseTime = (.) either2maybe $ flip parse "" $ do
+    h <- num
+    m <- option 0 (do { char ':' ; num })
+    offset <- choice [ string "am" >> return 0
+                     , string "pm" >> return 12
+                     , return 0
+                     ]
+    eof
+    return (h + offset,m)
+    where either2maybe (Left _) = Nothing
+          either2maybe (Right x) = Just x
+          num = parseNonNegative
+
+-- | try to find a time and duration specification in the given string
+-- The first word can consist of a single time or of two time
+-- specifications seperated by a squence of '-'. If the first word is neither
+-- then the string is returned unchanged. See tryParseTime for valid
+-- time sepcifications
+parseTimeDuration :: String -> (Maybe (Int,Int), Maybe (Int,Int), String)
+parseTimeDuration buf =
+    if isJust from_maybe
+    then (from_maybe,duration_maybe, dropWhile (== ' ') suffix)
+    else (Nothing, Nothing, buf)
+    where
+        -- split buf in first word and rest
+        (duration_str,suffix) = span (/= ' ') buf
+        (from_str,to_str') = span (/= '-') duration_str
+        to_str = dropWhile (== '-') to_str'
+        (from_maybe,duration_maybe) =
+            if to_str == ""
+            then (tryParseTime from_str, Nothing)
+            else maybe (Nothing,Nothing) (\(x,y) -> (Just x, Just y))
+                $ do
+                from <- tryParseTime from_str
+                to <- tryParseTime to_str
+                return
+                    $ if (fst (to `diffTime` from) >= 0)
+                    then (from, to `diffTime` from)
+                    else (from, from `diffTime` to)
+
 

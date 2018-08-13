@@ -3,18 +3,18 @@ module Tester where
 type TestM a = Either String a
 
 infixr 5 =!=
-(=!=) :: (Show a,Eq a) => a -> a -> Either String ()
+(=!=) :: (Show a,Eq a) => a -> a -> TestM ()
 (=!=) x y = do
   if (x == y)
   then return ()
   else Left $ "Failed assertion " ++ show x ++ " =!= " ++ show y
 
-runTester :: TestM () -> IO Int
+runTester :: TestM () -> IO Bool
 runTester t =
   case t of
     Left str -> do
-      error str
-      return 1
+      putStrLn str
+      return False
     Right () -> do
-      return 0
+      return True
 

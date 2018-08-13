@@ -11,6 +11,7 @@ import Data.Maybe
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Writer
 import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
 import Data.Time.Calendar (Day,addDays,diffDays,fromGregorian,gregorianMonthLength)
@@ -20,6 +21,7 @@ import Lens.Micro
 import Lens.Micro.TH
 import Lens.Micro.Mtl
 
+import Text.Printf
 import Data.Hashable
 
 type Config = FilePath
@@ -177,7 +179,16 @@ rebuildPtrStore items =
 
 reminderTemplate :: CB.PartialReminder -> String
 reminderTemplate prem =
-    "REM " ++ show (CB.prDay prem) ++ " MSG " ++ CB.prTitle prem ++ "\n"
+    execWriter $ do
+        tell "REM "
+        tell $ show (CB.prDay prem)
+        forM_ (CB.prTime prem) (\(h,m) ->
+                tell $ printf " AT %d:%02d" h m)
+        forM_ (CB.prDuration prem) (\(h,m) ->
+                tell $ printf " DURATION %d:%02d" h m)
+        forM_ (CB.prUntil prem) (\(day,intval) ->
+                tell $ printf " *%d UNTIL %s" intval (show day))
+        tell $ " MSG " ++ CB.prTitle prem ++ "\n"
 
 
 handleEvent :: CB.Event Event -> CB.BackendM St Event ()

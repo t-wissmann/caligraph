@@ -34,6 +34,23 @@ expandTilde s =
         return $ joinPath [home, tl]
      x -> return x
 
+diffTime
+    :: (Int,Int)
+    -- ^ substract this
+    -> (Int,Int)
+    -- ^ by this
+    -> (Int,Int)
+    -- ^ the result in (hours,minutes), where minutes is in [0,59]
+    --   if the difference is positive and in [-59,0] otherwise.
+diffTime (to_h,to_m) (from_h,from_m) =
+    (sgn * (diff_in_min `div` 60), sgn * (diff_in_min `mod` 60))
+    where
+        diff_in_min' = (to_h * 60 + to_m) - (from_h * 60 + from_m)
+        (sgn,diff_in_min) =
+            if diff_in_min' < 0
+            then (-1, -diff_in_min')
+            else (1,   diff_in_min')
+
 editFileExternally :: FilePath -> Int -> IO ()
 editFileExternally filepath line = do
     editor <- fmap (fromMaybe "vi") $ lookupEnv "EDITOR"

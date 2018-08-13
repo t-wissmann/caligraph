@@ -21,6 +21,7 @@ import Caligraph.Utils
 import Caligraph.Possibly
 import qualified Caligraph.Config.Calendars as Config
 import qualified Caligraph.Backend.Types as CB
+import qualified Caligraph.Backend.Utils as CB
 import qualified Caligraph.Calendar as CC
 
 import Control.Monad (when)
@@ -193,9 +194,11 @@ add_reminder_cmd =
     mode .= AMAppend
 
 addReminderFromString :: String -> Cmd St
-addReminderFromString title = do
+addReminderFromString buf = do
     day <- use (dayGrid . DayGrid.focusDay)
-    zoom calendar $ embed $ CC.addReminder $ CB.PartialReminder day title Nothing Nothing Nothing
+    let (from,duration,title) = CB.parseTimeDuration buf
+    let pr = CB.PartialReminder day title from duration Nothing
+    zoom calendar $ embed $ CC.addReminder $ pr
 
 fileIOQueries :: MonadIO io => StateT St io ()
 fileIOQueries = do

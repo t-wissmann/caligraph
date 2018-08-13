@@ -55,7 +55,8 @@ data PartialReminder = PartialReminder
     , prTime :: Maybe (Int,Int)
     , prDuration :: Maybe (Int,Int)
     , prUntil :: Maybe (Day,Int)
-    -- ^ if the reminder spans multiple days
+    -- ^ if the reminder spans multiple days: until when
+    --   and after how many days does it repeat
     }
 
 data Item i = Item
