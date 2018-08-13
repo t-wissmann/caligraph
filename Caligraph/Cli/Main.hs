@@ -194,6 +194,7 @@ add_reminder_cmd =
     mode .= AMAppend
 
 addReminderFromString :: String -> Cmd St
+addReminderFromString "" = return ()
 addReminderFromString buf = do
     day <- use (dayGrid . DayGrid.focusDay)
     let (from,duration,title) = CB.parseTimeDuration buf
