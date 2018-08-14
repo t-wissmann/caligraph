@@ -228,7 +228,7 @@ drawUI st =
   [DayGrid.render (st^.dayGrid) <=> status_line <=> input_line]
   where
     status_line = withAttr "statusline"
-        $ (padRight BT.Max $ str "To be done")
+        $ (padRight BT.Max $ str $ show $ DayGrid.rangeVisible $ (st^.dayGrid))
     input_line = withAttr "inputline"
       $ padRight BT.Max
       $ str
