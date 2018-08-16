@@ -19,6 +19,7 @@ import qualified Caligraph.Cli.DayWidget as DayWidget
 
 import Caligraph.Utils
 import Caligraph.Possibly
+import Caligraph.PointerStore (Ptr)
 import qualified Caligraph.Config.Main as MainConfig
 import qualified Caligraph.Config.Calendars as CalendarConfig
 import qualified Caligraph.Backend.Types as CB
@@ -168,7 +169,7 @@ focus_cmd dir = do
             focusItem .= idx
             dayGrid %= DayGrid.moveFocus dir
     where
-      reminderInDir :: Int -> [CB.Incarnation'] -> Either (Maybe Int) Int
+      reminderInDir :: Int -> [CB.Incarnation a] -> Either (Maybe Int) Int
       reminderInDir focusItemConcrete reminders =
         case dir of
             DirLeft -> Left (Just 0)
@@ -189,9 +190,9 @@ edit_externally_cmd = do
     idx <- fmap (fromMaybe $ length rems - 1) $ use focusItem
     if idx >= 0 && idx < length rems
     then do
-        let p = CB.itemId $ rems !! idx
+        let (i,p) = CB.itemId $ rems !! idx
         requestSuspendGui
-        zoom (calendar_idx 0) $ CC.editExternally p
+        zoom (calendar_idx i) $ CC.editExternally p
     else return ()
 
 add_reminder_cmd :: Cmd St
@@ -228,8 +229,13 @@ footer_height = 2
 drawUI st =
   [DayGrid.render (st^.dayGrid) <=> status_line <=> input_line]
   where
+    day = st^.dayGrid^.DayGrid.focusDay
+    reminders = runReader (getReminders day) st
+    idx = (fromMaybe $ length reminders - 1) $ st^.focusItem
+    focused_calendar_idx = if (idx >= 0 && idx < length reminders) then fst $ CB.itemId (reminders !! idx) else (-1)
     status_line = withAttr "statusline"
-        $ (padRight BT.Max $ str $ show $ DayGrid.rangeVisible $ (st^.dayGrid))
+        $ padRight BT.Max $ (str $ show $ DayGrid.rangeVisible $ (st^.dayGrid))
+            <+> str (' ':show focused_calendar_idx)
     input_line = withAttr "inputline"
       $ padRight BT.Max
       $ str
@@ -239,12 +245,13 @@ drawUI st =
           AMNormal ->
             fromMaybe "" $ listToMaybe (st^.messages)
 
-getReminders :: Monad m => Day -> ReaderT St m [CB.Incarnation']
+getReminders :: Monad m => Day -> ReaderT St m [CB.Incarnation (Int,Ptr)]
 getReminders day =
     do
     cals <- asks _calendars
-    incs <- forM cals (\(_,c) ->
-        return $ fromMaybe []
+    incs <- forM (zip [0..] cals) (\(i,(_,c)) ->
+        return $ map (fmap ((,) i))
+               $ fromMaybe []
                $ safeArray (CC.cachedIncarnations c (day,day)) day)
     return $ L.sort $ concat incs
 
@@ -366,7 +373,7 @@ day2widget st day =
             (if focus == day && (st^.mode) == AMNormal
               then Just $ fromMaybe (length reminders - 1) (st^.focusItem)
               else Nothing)
-            reminders
+            (map (fmap snd) reminders)
             day
             today
             (case (st^.mode, focus==day) of
