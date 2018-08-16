@@ -3,6 +3,7 @@ module Utils where
 
 import Caligraph.Utils
 import Tester
+import Control.Monad.State
 
 testUtils :: TestM ()
 testUtils = do
@@ -12,3 +13,21 @@ testUtils = do
     (2,20) `diffTime` (4,30) =!= (-2,-10)
     (0,0) `diffTime` (0,0) =!= (0,00)
     (23,59) `diffTime` (0,0) =!= (23,59)
+    testForState
+
+plus1 :: State Int Int
+plus1 = do
+    n <- get
+    put (n+1)
+    return n
+
+testForState :: TestM ()
+testForState =
+    let
+        input = [1..4]
+        c1 :: State [Int] [Int]
+        c1 = forState (plus1)
+        c2 :: State [Int] [Int]
+        c2 = do modify (map ((+) 1)) ; return input
+    in
+    runState c1 input =!= runState c2 input

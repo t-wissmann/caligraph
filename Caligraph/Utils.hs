@@ -70,3 +70,10 @@ mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f (Left b) = Left $ f b
 mapLeft _ (Right b) = Right b
 
+forState :: Monad m => StateT s m r -> StateT [s] m [r]
+forState prog = do
+    values <- get
+    (results,states) <- lift $ fmap unzip $ mapM (runStateT prog) values
+    put states
+    return results
+

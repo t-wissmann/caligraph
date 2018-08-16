@@ -15,6 +15,7 @@ import Data.Text (Text)
 import Lens.Micro
 import Lens.Micro.TH
 import Lens.Micro.Mtl
+import Control.Monad.State
 
 data AppMode
     = AMNormal
