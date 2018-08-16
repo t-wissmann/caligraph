@@ -7,6 +7,7 @@ import System.Environment
 import System.Process
 import Data.Array as A
 import Data.Maybe
+import Data.Functor.Identity
 
 import Control.Monad.State
 import Control.Monad.Reader
@@ -70,10 +71,14 @@ mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f (Left b) = Left $ f b
 mapLeft _ (Right b) = Right b
 
-forState :: Monad m => StateT s m r -> StateT [s] m [r]
+forState :: (Traversable t, Monad m) => StateT s m r -> StateT (t s) m (t r)
 forState prog = do
     values <- get
-    (results,states) <- lift $ fmap unzip $ mapM (runStateT prog) values
+    (results,states) <- lift $ fmap funzip $ mapM (runStateT prog) values
     put states
     return results
+    where
+        funzip :: Functor f => f (a,b) -> (f a, f b)
+        funzip x = (fmap fst x, fmap snd x)
+
 
