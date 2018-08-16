@@ -206,13 +206,14 @@ addReminderFromString buf = do
     let pr = CB.PartialReminder day title from duration Nothing
     zoom (calendar_idx 0) $ embed $ CC.addReminder $ pr
 
+forEachCalendar :: Monad m => StateT CC.Calendar m a -> StateT St m [a]
+forEachCalendar =
+    zoom calendars . forState . zoom _2
+
 fileIOQueries :: MonadIO io => StateT St io ()
-fileIOQueries =
-    do
-    log <- zoom (calendar_idx 0) $ CC.fileQuery
-    case log of
-        Just m -> messages %= (:) m
-        Nothing -> return ()
+fileIOQueries = do
+    log <- forEachCalendar CC.fileQuery
+    messages %= (++) (mapMaybe id log)
 
 
 fixFocusItem :: Monad m => StateT St m ()
@@ -385,7 +386,7 @@ updateDayRange' :: Monad m => Bool -> StateT St m ()
 updateDayRange' force = do
     -- get currently visible day range
     day_range <- fmap DayGrid.rangeVisible $ use dayGrid
-    zoom (calendar_idx 0) $ embed $ CC.setRangeVisible day_range
+    forEachCalendar $ embed $ CC.setRangeVisible day_range
     -- TODO: why do we need this here?
     s <- get
     dayGrid %= (DayGrid.resizeDays $ day2widget s)
