@@ -66,10 +66,12 @@ data CmdOutput = CmdOutput
     , cmdoutSuspendGui :: Max Bool
     }
 
+instance Semigroup CmdOutput where
+    (<>) (CmdOutput a1 a2) (CmdOutput b1 b2) =
+        CmdOutput (mappend a1 b1) (mappend a2 b2)
+
 instance Monoid CmdOutput where
     mempty = CmdOutput mempty mempty
-    mappend (CmdOutput a1 a2) (CmdOutput b1 b2) =
-        CmdOutput (mappend a1 b1) (mappend a2 b2)
 
 
 data FgIO a = NoFg a | WithFg (IO a)
@@ -285,10 +287,10 @@ mainApp =
         , ("dayOfWeek", magenta `on` black)
         , ("statusline", blue `on` black)
         , ("reminderTitle", defAttr)
-        , ("reminderTime", Attr (SetTo bold) (SetTo green) KeepCurrent)
+        , ("reminderTime", Attr (SetTo bold) (SetTo green) KeepCurrent KeepCurrent)
         , ("selectedReminderTitle", bg black)
         , (Brick.editFocusedAttr, bg black)
-        , ("selectedReminderTime", Attr (SetTo bold) (SetTo green) (SetTo black))
+        , ("selectedReminderTime", Attr (SetTo bold) (SetTo green) (SetTo black) KeepCurrent)
         ]
       }
 
