@@ -27,6 +27,7 @@ import qualified Caligraph.Backend.Utils as CB
 import qualified Caligraph.Calendar as CC
 
 import Control.Monad (when)
+import Control.Monad.Loops (whileM_)
 import Control.Monad.State
 import Control.Monad.Writer.Lazy
 import Control.Monad.Reader
@@ -52,8 +53,10 @@ import Graphics.Vty.Output.Interface (supportsMode,Mode(Mouse),setMode)
 import qualified Data.Map.Strict as Map
 import qualified Data.HashMap.Strict as HashMap
 import System.Exit
+import System.IO
 import System.Environment (getArgs,setEnv)
 import Control.Concurrent (forkIO)
+import Control.Concurrent.MVar
 
 import System.Process
 
@@ -142,8 +145,8 @@ binds = Map.fromList
   , (([MCtrl], KChar 'u'), dayGrid %= DayGrid.scrollPage (-0.45))
   , (([MCtrl], KChar 'f'), dayGrid %= DayGrid.scrollPage 0.90)
   , (([MCtrl], KChar 'b'), dayGrid %= DayGrid.scrollPage (-0.90))
-  -- , (([], KChar '$'), shell_cmd "~/.reminders.d/mkpdf.sh")
-  , (([], KChar '$'), shell_cmd "~/.reminders.d/blalog.sh")
+  -- , (([], KChar '$'), shell_cmd "~/.reminders.d/bla.sh")
+  , (([], KChar '$'), shell_cmd "~/.reminders.d/mkpdf.sh")
   , (([], KChar 'X'), toggle_log_cmd)
 
   -- hjkl
@@ -203,13 +206,27 @@ focus_cmd dir = do
 -- | Execute the given line in the shell
 shell_cmd :: String -> Cmd St
 shell_cmd cmd = do
-    let cp = CreateProcess (ShellCommand cmd) Nothing Nothing NoStream NoStream NoStream True False False True False False Nothing Nothing True
+    let cp = CreateProcess (ShellCommand cmd) Nothing Nothing NoStream CreatePipe CreatePipe True False False True False False Nothing Nothing True
     chan <- use eventChannel
     thread_id <- liftIO $ forkIO $ do
-        (_, _, _, proc) <- createProcess cp
+        (_, procout, procerr, proc) <- createProcess cp
+        err_finished <- newEmptyMVar
+        out_finished <- newEmptyMVar
+        forkIO $ consumeThenNotify procout (writeBChan chan . ProcessOutput cmd) out_finished
+        forkIO $ consumeThenNotify procerr (writeBChan chan . ProcessError  cmd) err_finished
+        takeMVar err_finished
+        takeMVar out_finished
         exitCode <- waitForProcess proc
         writeBChan chan (ProcessFinished cmd exitCode)
     return ()
+    where
+        consumeThenNotify :: Maybe Handle -> (String -> IO ()) -> MVar () -> IO ()
+        consumeThenNotify maybe_handle lineConsumer whenFinished = do
+            case maybe_handle of
+                Nothing -> return()
+                Just handle ->
+                    whileM_ (fmap not $ hIsEOF handle) (hGetLine handle >>= lineConsumer)
+            putMVar whenFinished ()
 
 edit_externally_cmd :: Cmd St
 edit_externally_cmd = do
@@ -405,7 +422,11 @@ myHandleEvent s (AppEvent ev) =
             s'' <- get
             dayGrid %= (DayGrid.resizeDays $ day2widget s'')
         ProcessFinished cmd exitCode ->
-            log_message ("»" ++ cmd ++ "« finished with " ++ show exitCode)
+            log_message (cmd ++ " finished with " ++ show exitCode)
+        ProcessOutput cmd msg ->
+            log_message (cmd ++ ": " ++ msg)
+        ProcessError cmd msg ->
+            log_message (cmd ++ " error: " ++ msg)
 
 myHandleEvent s (MouseDown (WNDay d) BLeft _ _) =
       continue (s & dayGrid %~ DayGrid.setFocus d & focusItem .~ Just 0 & updateDayRange)

@@ -30,6 +30,8 @@ data ExternalEvent
     = CalendarIO Int
     -- ^ a calendar io for the i'th calendar
     | ProcessFinished String ExitCode
+    | ProcessOutput String String
+    | ProcessError String String
     -- ^ one of the subprocesses finished
 
 data AppState = AppState

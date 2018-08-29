@@ -48,6 +48,7 @@ library
     , microlens
     , microlens-th
     , microlens-mtl
+    , monad-loops
     , array
     , mtl
     , contravariant
