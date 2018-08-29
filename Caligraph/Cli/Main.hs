@@ -223,7 +223,7 @@ shell_cmd cmd = do
         consumeThenNotify :: Maybe Handle -> (String -> IO ()) -> MVar () -> IO ()
         consumeThenNotify maybe_handle lineConsumer whenFinished = do
             case maybe_handle of
-                Nothing -> return()
+                Nothing -> return ()
                 Just handle ->
                     whileM_ (fmap not $ hIsEOF handle) (hGetLine handle >>= lineConsumer)
             putMVar whenFinished ()
@@ -297,7 +297,7 @@ drawUI st =
             fromMaybe "" $ fmap snd $ listToMaybe (st^.messages)
     showLocalTime (LocalTime day (TimeOfDay h m s)) =
         let MkFixed i = s in
-        printf "%s %02d:%02d:%d.%03d" (show day) h m (i `div` (resolution s)) ((i * 1000) `div` (resolution s) `mod` 1000)
+        printf "%s %02d:%02d:%02d.%03d" (show day) h m (i `div` (resolution s)) ((i * 1000) `div` (resolution s) `mod` 1000)
     logWindow =
       if (st^.showLogLines) < 0 then Nothing else Just $
         take (st^.showLogLines) (st^.messages)
