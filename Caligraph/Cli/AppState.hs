@@ -12,6 +12,8 @@ import qualified Brick.BChan as Brick
 import Data.Array
 import Data.Time.Calendar (Day)
 import Data.Text (Text)
+import Data.Time.Clock (UTCTime)
+import Data.Time.LocalTime (TimeZone)
 
 import Lens.Micro
 import Lens.Micro.TH
@@ -35,10 +37,12 @@ data AppState = AppState
     , _dayGrid :: DayGrid.St WidgetName
     , _focusItem :: Maybe Int -- the item focused within a day, Nothing means 'the last'
     , _calendars :: [(Text,Calendar.Calendar)]
-    , _messages :: [LogLine]
+    , _messages :: [(UTCTime,LogLine)]
     , _mode :: AppMode
     , _newReminderEditor :: Brick.Editor String WidgetName
     , _eventChannel :: Brick.BChan ExternalEvent
+    , _timeZone :: TimeZone
+    , _showLogLines :: Int -- number of log lines to show
     }
 
 makeLenses ''AppState

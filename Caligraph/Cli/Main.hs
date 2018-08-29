@@ -33,12 +33,16 @@ import Control.Monad.Reader
 import Control.Monad.IO.Class (liftIO)
 import Data.Array
 import Data.Maybe
+import Data.Fixed (Fixed(MkFixed),resolution)
 import qualified Data.List as L
 import Data.Semigroup
 import Data.Functor.Identity
+import Data.Time.Clock (getCurrentTime)
+import Data.Time.LocalTime (getCurrentTimeZone,utcToLocalTime,LocalTime(LocalTime),TimeOfDay(TimeOfDay))
 import qualified Caligraph.Cli.UnicodeJunction as UJ
 
 import qualified Data.Text as T
+import Text.Printf (printf)
 import Data.Time.Calendar
 import qualified Graphics.Vty as V
 import Graphics.Vty.Attributes
@@ -140,6 +144,7 @@ binds = Map.fromList
   , (([MCtrl], KChar 'b'), dayGrid %= DayGrid.scrollPage (-0.90))
   -- , (([], KChar '$'), shell_cmd "~/.reminders.d/mkpdf.sh")
   , (([], KChar '$'), shell_cmd "~/.reminders.d/blalog.sh")
+  , (([], KChar 'X'), toggle_log_cmd)
 
   -- hjkl
   , (([], KChar 'h'), focus_cmd DirLeft)
@@ -158,8 +163,13 @@ quit_cmd =
     aboutToQuit .= True
 
 log_message :: String -> Cmd St
-log_message msg =
-    messages %= (:) msg
+log_message msg = do
+    now <- liftIO getCurrentTime
+    messages %= (:) (now,msg)
+
+toggle_log_cmd :: Cmd St
+toggle_log_cmd =
+    showLogLines %= (*) (-1)
 
 focus_cmd :: Dir -> Cmd St
 focus_cmd dir = do
@@ -229,10 +239,10 @@ forEachCalendar :: Monad m => StateT CC.Calendar m a -> StateT St m [a]
 forEachCalendar =
     zoom calendars . forState . zoom _2
 
-fileIOQueries :: MonadIO io => StateT St io ()
+fileIOQueries :: Cmd St
 fileIOQueries = do
     log <- forEachCalendar CC.fileQuery
-    messages %= (++) (mapMaybe id log)
+    mapM_ log_message (mapMaybe id log)
 
 
 fixFocusItem :: Monad m => StateT St m ()
@@ -245,7 +255,13 @@ fixFocusItem = do
 footer_height = 2
 
 drawUI st =
-  [DayGrid.render (st^.dayGrid) <=> status_line <=> input_line]
+  [vBox $ mapMaybe id
+      [ Just $ DayGrid.render (st^.dayGrid)
+      , logWindow
+      , Just $ status_line
+      , Just $ input_line
+      ]
+  ]
   where
     day = st^.dayGrid^.DayGrid.focusDay
     reminders = runReader (getReminders day) st
@@ -261,7 +277,20 @@ drawUI st =
           AMAppend ->
             "-- INSERT --"
           AMNormal ->
-            fromMaybe "" $ listToMaybe (st^.messages)
+            fromMaybe "" $ fmap snd $ listToMaybe (st^.messages)
+    showLocalTime (LocalTime day (TimeOfDay h m s)) =
+        let MkFixed i = s in
+        printf "%s %02d:%02d:%d.%03d" (show day) h m (i `div` (resolution s)) ((i * 1000) `div` (resolution s) `mod` 1000)
+    logWindow =
+      if (st^.showLogLines) < 0 then Nothing else Just $
+        take (st^.showLogLines) (st^.messages)
+        & map (\(t,m) ->
+            withAttr ("log" <> "timestamp") (str $ showLocalTime $ utcToLocalTime (st^.timeZone) t)
+            <+>  withAttr ("log" <> "message") (str (' ':m))
+            )
+        & reverse
+        & vBox
+        & (forceAttr ("log" <> "border") hBorder <=>)
 
 getReminders :: Monad m => Day -> ReaderT St m [CB.Incarnation (Int,Ptr)]
 getReminders day =
@@ -307,6 +336,9 @@ mainApp =
         , ("selectedReminderTitle", bg black)
         , (Brick.editFocusedAttr, bg black)
         , ("selectedReminderTime", Attr (SetTo bold) (SetTo green) (SetTo black) KeepCurrent)
+        , ("log" <> "border", fg black)
+        , ("log" <> "timestamp", fg white)
+        , ("log" <> "message", defAttr)
         ]
       }
 
@@ -367,7 +399,7 @@ myHandleEvent s (AppEvent ev) =
             zoom (calendar_idx idx) CC.receiveResult
             log <- zoom (calendar_idx idx) $ CC.fileQuery
             case log of
-                Just m -> messages %= (:) m
+                Just m -> log_message m
                 Nothing -> return ()
             c <- use (calendar_idx idx)
             s'' <- get
@@ -442,8 +474,10 @@ testmain = do
     cal <- rightOrDie $ CC.fromConfig (writeBChan chan (CalendarIO i)) raw_c
     cal' <- cal
     (msg, cal'') <- runStateT (do embed (CC.setRangeVisible day_range); CC.fileQuery) cal'
-    return (msg, (t,cal''))
+    now <- getCurrentTime
+    return (fmap ((,) now) msg, (t,cal''))
     )
+  tz <- getCurrentTimeZone
   customMain buildVty (Just chan) mainApp
     (AppState
         False
@@ -454,6 +488,8 @@ testmain = do
         AMNormal
         emptyReminderEditor
         chan
+        tz
+        (-8)
         )
   return ()
 
