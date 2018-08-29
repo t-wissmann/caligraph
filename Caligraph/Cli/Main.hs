@@ -49,6 +49,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.HashMap.Strict as HashMap
 import System.Exit
 import System.Environment (getArgs,setEnv)
+import Control.Concurrent (forkIO)
+
+import System.Process
 
 import Debug.Trace
 
@@ -56,10 +59,6 @@ import Lens.Micro
 import Lens.Micro.Mtl
 
 type St =  Caligraph.Cli.AppState.AppState
-
-data ExternalEvent =
-    CalendarIO Int
-    -- ^ a calendar io for the i'th calendar
 
 data CmdOutput = CmdOutput
     { cmdoutStderr :: [String]
@@ -139,6 +138,8 @@ binds = Map.fromList
   , (([MCtrl], KChar 'u'), dayGrid %= DayGrid.scrollPage (-0.45))
   , (([MCtrl], KChar 'f'), dayGrid %= DayGrid.scrollPage 0.90)
   , (([MCtrl], KChar 'b'), dayGrid %= DayGrid.scrollPage (-0.90))
+  -- , (([], KChar '$'), shell_cmd "~/.reminders.d/mkpdf.sh")
+  , (([], KChar '$'), shell_cmd "~/.reminders.d/blalog.sh")
 
   -- hjkl
   , (([], KChar 'h'), focus_cmd DirLeft)
@@ -155,6 +156,10 @@ binds = Map.fromList
 quit_cmd :: Cmd St
 quit_cmd =
     aboutToQuit .= True
+
+log_message :: String -> Cmd St
+log_message msg =
+    messages %= (:) msg
 
 focus_cmd :: Dir -> Cmd St
 focus_cmd dir = do
@@ -184,6 +189,17 @@ focus_cmd dir = do
                 if focusItemConcrete + 1 < length reminders
                 then Right $ focusItemConcrete + 1
                 else Left (Just 0)
+
+-- | Execute the given line in the shell
+shell_cmd :: String -> Cmd St
+shell_cmd cmd = do
+    let cp = CreateProcess (ShellCommand cmd) Nothing Nothing NoStream NoStream NoStream True False False True False False Nothing Nothing True
+    chan <- use eventChannel
+    thread_id <- liftIO $ forkIO $ do
+        (_, _, _, proc) <- createProcess cp
+        exitCode <- waitForProcess proc
+        writeBChan chan (ProcessFinished cmd exitCode)
+    return ()
 
 edit_externally_cmd :: Cmd St
 edit_externally_cmd = do
@@ -345,18 +361,20 @@ myHandleEvent s (VtyEvent e) =
     _ ->
       continue s
 myHandleEvent s (AppEvent ev) =
-    case ev of
+    execCmd s $ do
+      case ev of
         CalendarIO idx -> do
-            s' <- flip execStateT s $ do
-                zoom (calendar_idx idx) CC.receiveResult
-                log <- zoom (calendar_idx idx) $ CC.fileQuery
-                case log of
-                    Just m -> messages %= (:) m
-                    Nothing -> return ()
-                c <- use (calendar_idx idx)
-                s'' <- get
-                dayGrid %= (DayGrid.resizeDays $ day2widget s'')
-            continue s'
+            zoom (calendar_idx idx) CC.receiveResult
+            log <- zoom (calendar_idx idx) $ CC.fileQuery
+            case log of
+                Just m -> messages %= (:) m
+                Nothing -> return ()
+            c <- use (calendar_idx idx)
+            s'' <- get
+            dayGrid %= (DayGrid.resizeDays $ day2widget s'')
+        ProcessFinished cmd exitCode ->
+            log_message ("»" ++ cmd ++ "« finished with " ++ show exitCode)
+
 myHandleEvent s (MouseDown (WNDay d) BLeft _ _) =
       continue (s & dayGrid %~ DayGrid.setFocus d & focusItem .~ Just 0 & updateDayRange)
 myHandleEvent s (MouseDown (WNDayItem d idx) BLeft _ _) =
@@ -435,6 +453,7 @@ testmain = do
         (mapMaybe id log)
         AMNormal
         emptyReminderEditor
+        chan
         )
   return ()
 

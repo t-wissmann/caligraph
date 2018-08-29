@@ -7,6 +7,7 @@ import Caligraph.Cli.Types
 import qualified Caligraph.Calendar as Calendar
 import qualified Caligraph.Cli.DayGrid as DayGrid
 import qualified Brick.Widgets.Edit as Brick
+import qualified Brick.BChan as Brick
 
 import Data.Array
 import Data.Time.Calendar (Day)
@@ -16,11 +17,18 @@ import Lens.Micro
 import Lens.Micro.TH
 import Lens.Micro.Mtl
 import Control.Monad.State
+import System.Exit (ExitCode)
 
 data AppMode
     = AMNormal
     | AMAppend
     deriving (Eq,Show)
+
+data ExternalEvent
+    = CalendarIO Int
+    -- ^ a calendar io for the i'th calendar
+    | ProcessFinished String ExitCode
+    -- ^ one of the subprocesses finished
 
 data AppState = AppState
     { _aboutToQuit :: Bool
@@ -30,6 +38,7 @@ data AppState = AppState
     , _messages :: [LogLine]
     , _mode :: AppMode
     , _newReminderEditor :: Brick.Editor String WidgetName
+    , _eventChannel :: Brick.BChan ExternalEvent
     }
 
 makeLenses ''AppState
