@@ -10,6 +10,7 @@ import Caligraph.Remind.Types (month_names)
 import Caligraph.Utils (expandTilde,editFileExternally)
 
 import Control.Monad.State
+import Control.Monad.Writer (tell)
 
 import Data.List
 import Data.Maybe
@@ -23,6 +24,7 @@ import Caligraph.PointerStore as PS
 
 import System.FilePath
 import System.Process
+import System.Exit
 
 import Lens.Micro
 import Lens.Micro.Mtl
@@ -44,8 +46,9 @@ data St = St
 makeLenses ''St
 
 data Event =
-    MonthData Month [CB.Incarnation SourceLocation]
+    MonthData Month [CB.Incarnation SourceLocation] (ExitCode,String)
     | FlushCache
+
 
 nextMonth :: Month -> Month
 nextMonth (year,m) =
@@ -106,9 +109,9 @@ requestMonth tilde_path (y,month) = do
     let mon_name = month_names !! (month-1)
     let rem = "remind"
     let rem_args = ["-r", "-s", "-l", filepath, mon_name, show y]
-    raw_output <- liftIO $ readProcess rem rem_args ""
+    (exitCode,raw_output,raw_error) <- liftIO $ readProcessWithExitCode rem rem_args ""
     let days_in_month = parseRemOutput raw_output
-    return $ MonthData (y,month) (map snd days_in_month)
+    return $ MonthData (y,month) (map snd days_in_month) (exitCode,raw_error)
 
 handleEvent :: CB.Event Event -> CB.BackendM St Event ()
 handleEvent (CB.SetRangeVisible days) = do
@@ -130,12 +133,13 @@ handleEvent (CB.Response (FlushCache)) = do
   forM_ (M.keys mc) $ \m -> do
       cacheMisses %= M.insert m False
 
-handleEvent (CB.Response (MonthData m days)) = do
+handleEvent (CB.Response (MonthData m days (exitCode,stderr))) = do
   days' <- flip mapM days $ \inc -> do
     ptr <- zoom idStore $ PS.lookupOrInsert (CB.itemId inc)
     return (CB.day inc, inc { CB.itemId = ptr})
   cacheMisses %= M.delete m
   monthCache %= M.insert m ((A.accumArray (flip (:)) [] (monthRange m) days') :: CB.Incarnations')
+  when ("" /= stderr) $ tell [CB.BAError stderr]
   return ()
 
 requestMissingMonths :: CB.BackendM St Event ()

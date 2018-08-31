@@ -37,6 +37,7 @@ data ExternalEvent
 data AppState = AppState
     { _aboutToQuit :: Bool
     , _dayGrid :: DayGrid.St WidgetName
+    , _dayRange :: (Day,Day)
     , _focusItem :: Maybe Int -- the item focused within a day, Nothing means 'the last'
     , _calendars :: [(Text,Calendar.Calendar)]
     , _messages :: [(UTCTime,LogLine)]

@@ -64,7 +64,7 @@ read_only computation = do
     lift $ runReaderT computation s
 
 callback :: String -> IO event -> BackendM state event ()
-callback txt io_action = tell [BackendQuery txt io_action]
+callback txt io_action = tell [BAQuery $ BackendQuery txt io_action]
 
 parseNonNegative :: (Read a, Num a) => GenParser Char st a
 parseNonNegative = read <$> many1 digit

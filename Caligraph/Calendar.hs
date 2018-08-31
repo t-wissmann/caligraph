@@ -10,10 +10,12 @@ import qualified Caligraph.Backend.Registered as CBR
 import qualified Data.HashMap.Strict as M
 import Caligraph.PointerStore (Ptr)
 import qualified Caligraph.Utils as CU
+import Caligraph.Cli.Types (LogLine)
 
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Reader
+import Control.Monad.Identity
 import qualified Data.Text as T
 import Data.List (find)
 import Data.Time.Calendar (Day)
@@ -43,16 +45,22 @@ makeLenses ''RawCalendar
 data Calendar = forall stateType eventType.
         Calendar (RawCalendar stateType eventType)
 
-zoomBackend :: Monad m => (CB.Backend s q -> CB.BackendM s q a) -> StateT (RawCalendar s q) m a
+type CalendarT m a = StateT Calendar (WriterT [LogLine] m) a
+type CalendarM a = CalendarT Identity a
+
+zoomBackend :: Monad m => (CB.Backend s q -> CB.BackendM s q a) -> StateT (RawCalendar s q) (WriterT [LogLine] m) a
 zoomBackend state_action = do
     be <- use calBackend
     st <- use calState
-    let ((r,new_st),new_queries) = runWriter (runStateT (state_action be) st)
+    let ((r,new_st),new_actions) = runWriter (runStateT (state_action be) st)
     calState .= new_st
-    calOpenQueries %= (++) new_queries
+    forM_ new_actions (\i ->
+        case i of
+            CB.BAQuery q -> calOpenQueries %= (:) q
+            CB.BAError r -> tell [r])
     return r
 
-zoomBackendEvent :: Monad m => (CB.Event q) -> StateT (RawCalendar s q) m ()
+zoomBackendEvent :: Monad m => (CB.Event q) -> StateT (RawCalendar s q) (WriterT [LogLine] m) ()
 zoomBackendEvent ev = zoomBackend (\be -> CB.handleEvent be ev)
 
 doCalendar :: Monad m => (forall s q.
@@ -82,28 +90,28 @@ fromConfig noticeDataReady cc = do
         getOption :: String -> Maybe String
         getOption x = fmap T.unpack $ M.lookup (T.pack x) $ Conf.allSettings cc
 
-setRangeVisible :: (Day,Day) -> State Calendar ()
+setRangeVisible :: Monad m => (Day,Day) -> CalendarT m ()
 setRangeVisible range = doCalendar $ do zoomBackendEvent $ CB.SetRangeVisible range
 
 cachedIncarnations :: Calendar -> (Day,Day) -> CB.Incarnations'
 cachedIncarnations (Calendar c) range =
     (CB.cachedIncarnations (_calBackend c) (_calState c) range)
 
-fileQuery :: MonadIO io => StateT Calendar io (Maybe String)
+fileQuery :: MonadIO io => CalendarT io ()
 fileQuery = doCalendar $ do
     waiting <- use calWaitingForResult
     queue <- use calOpenQueries
-    if waiting then return Nothing else do
+    when (not waiting) $
         case queue of
-            [] -> return Nothing
+            [] -> return ()
             ((CB.BackendQuery msg action):queue') -> do
                 mv <- use calMVarQuery
                 liftIO $ putMVar mv action
                 calWaitingForResult .= True
                 calOpenQueries .= queue'
-                return $ Just msg
+                tell [msg]
 
-receiveResult :: MonadIO io => StateT Calendar io ()
+receiveResult :: MonadIO io => CalendarT io ()
 receiveResult = doCalendar $ do
     waiting <- use calWaitingForResult
     when waiting $ do
@@ -112,19 +120,19 @@ receiveResult = doCalendar $ do
         calWaitingForResult .= False
         zoomBackendEvent $ CB.Response res
 
-editExternally :: MonadIO io => Ptr -> StateT Calendar io ()
+editExternally :: MonadIO io => Ptr -> CalendarT io ()
 editExternally ptr = doCalendar $ do
     be <- use calBackend
-    CB.ExistingFile (path, line) cb <- CU.embed $ zoomBackend (\be -> CB.itemSource be ptr)
+    CB.ExistingFile (path, line) cb <- zoomBackend (\be -> CB.itemSource be ptr)
     path' <- liftIO $ CU.expandTilde path
     liftIO $ CU.editFileExternally path' line
-    CU.embed $ zoomBackendEvent $ CB.Response cb
+    zoomBackendEvent $ CB.Response cb
 
     ---- st <- get
     ---- be <- return (st^.calBackend)
     --zoom calState $ mapStateT liftIO $ CB.editExternally be identifier
 
-addReminder :: CB.PartialReminder -> State Calendar ()
+addReminder :: Monad m => CB.PartialReminder -> CalendarT m ()
 addReminder pr = doCalendar $ zoomBackendEvent $ CB.AddReminder pr
 
 

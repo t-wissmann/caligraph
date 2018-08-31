@@ -3,6 +3,7 @@ module Caligraph.Backend.Types where
 import Data.Time.Calendar (Day)
 import Data.Time.Calendar (Day,addDays,diffDays)
 import Caligraph.PointerStore (Ptr)
+import Caligraph.Cli.Types (LogLine)
 
 import Text.Printf
 import Data.Ord
@@ -75,7 +76,11 @@ data BackendQuery a = BackendQuery
     , bqIO :: (IO a)
     }
 
-type BackendM state event a = StateT state (Writer [BackendQuery event]) a
+data BackendAction a =
+      BAQuery (BackendQuery a)
+    | BAError LogLine
+
+type BackendM state event a = StateT state (Writer [BackendAction event]) a
 
 -- | tell where the source code of an item can be edited
 data ItemSource event =

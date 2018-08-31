@@ -165,7 +165,7 @@ quit_cmd :: Cmd St
 quit_cmd =
     aboutToQuit .= True
 
-log_message :: String -> Cmd St
+log_message :: MonadIO m => String -> StateT St m ()
 log_message msg = do
     now <- liftIO getCurrentTime
     messages %= (:) (now,msg)
@@ -237,7 +237,7 @@ edit_externally_cmd = do
     then do
         let (i,p) = CB.itemId $ rems !! idx
         requestSuspendGui
-        zoom (calendar_idx i) $ CC.editExternally p
+        forCalendar i $ CC.editExternally p
     else return ()
 
 add_reminder_cmd :: Cmd St
@@ -250,21 +250,25 @@ addReminderFromString buf = do
     day <- use (dayGrid . DayGrid.focusDay)
     let (from,duration,title) = CB.parseTimeDuration buf
     let pr = CB.PartialReminder day title from duration Nothing
-    zoom (calendar_idx 0) $ embed $ CC.addReminder $ pr
+    forCalendar 0 (CC.addReminder pr)
 
-forEachCalendar :: Monad m => StateT CC.Calendar m a -> StateT St m [a]
-forEachCalendar =
-    zoom calendars . forState . zoom _2
+runMessageWriter :: MonadIO m => (w -> LogLine) -> StateT St (WriterT [w] m) a -> StateT St m a
+runMessageWriter msg prog = do
+    (a, ws) <- mapStateT (fmap (\((a,s),w) -> ((a,w),s)) . runWriterT) prog
+    forM_ ws (log_message . msg)
+    return a
 
-fileIOQueries :: Cmd St
-fileIOQueries = do
-    log <- forEachCalendar CC.fileQuery
-    mapM_ log_message (mapMaybe id log)
 
+forEachCalendar :: MonadIO m => CC.CalendarT m a -> StateT St m [a]
+forEachCalendar prog = do
+    runMessageWriter id (zoom calendars $ forState $ zoom _2 $ prog)
+
+forCalendar :: MonadIO m => Int -> CC.CalendarT m a -> StateT St m a
+forCalendar idx prog = do
+    runMessageWriter id (zoom (calendar_idx idx) prog)
 
 fixFocusItem :: Monad m => StateT St m ()
 fixFocusItem = do
-    updateDayRange' True
     day <- use $ dayGrid . DayGrid.focusDay
     reminders <- readOnly $ getReminders day
     focusItem %= fmap (min $ length reminders - 1)
@@ -339,7 +343,7 @@ mainApp =
             s' <- return (s & (dayGrid .~ dg))
             myHandleEvent s' ev
         )
-      , appStartEvent = (\s -> tryEnableMouse >> return (updateDayRange s))
+      , appStartEvent = (\s -> tryEnableMouse >> return s)
       , appAttrMap = const $ attrMap defAttr
         [ ("cellBorder", fg white)
         , ("cellHeader", yellow `on` black)
@@ -361,23 +365,29 @@ mainApp =
 
 scrollStep = 3
 
-continueOrHalt :: St -> EventM wn (Next St)
-continueOrHalt s =
-    if s^.aboutToQuit
-    then halt s
-    else continue s
-
 execCmd :: St -> Cmd St -> EventM WidgetName (Next St)
 execCmd s cmd =
-    let Breakpoint io_action = runStateT (do cmd ; fileIOQueries) s in
+    let Breakpoint io_action = flip runStateT s $
+            do
+            cmd
+            dr <- use dayRange
+            new_dr <- fmap DayGrid.rangeVisible $ use dayGrid
+            when (dr /= new_dr) $ do
+                dayRange .= new_dr
+                void $ forEachCalendar (CC.setRangeVisible new_dr)
+            void $ forEachCalendar CC.fileQuery
+            s <- get
+            dayGrid %= (DayGrid.resizeDays $ day2widget s)
+    in
     do
         possibly_io <- liftIO $ io_action
         case possibly_io of
             Pure ((),s') ->
-                continueOrHalt (updateDayRange s')
+                if (s')^.aboutToQuit
+                then halt s'
+                else continue s'
             Monadic fg_io_action ->
-                suspendAndResume $
-                    fmap (updateDayRange . snd) fg_io_action
+                suspendAndResume (fmap (\((), s) -> s) fg_io_action)
 
 myHandleEvent :: St -> BrickEvent WidgetName ExternalEvent -> EventM WidgetName (Next St)
 myHandleEvent s (VtyEvent e) =
@@ -387,7 +397,7 @@ myHandleEvent s (VtyEvent e) =
         AMAppend ->
           case (key,mods) of
             (KEsc,[]) ->
-              continue (s & mode .~ AMNormal & updateDayRange)
+              continue (s & mode .~ AMNormal)
             (KEnter,[]) ->
               execCmd s $ do
                   editor <- use newReminderEditor
@@ -395,29 +405,26 @@ myHandleEvent s (VtyEvent e) =
                   mode .= AMNormal
                   addReminderFromString (head (getEditContents editor))
             _ ->
-              continue =<< fmap updateDayRange (handleEventLensed s newReminderEditor Brick.handleEditorEvent (EvKey key mods))
+              continue =<< (handleEventLensed s newReminderEditor Brick.handleEditorEvent (EvKey key mods))
         AMNormal ->
           case Map.lookup (mods,key) binds of
             Just cmd ->
                 execCmd s cmd
-            Nothing -> continue (updateDayRange s)
+            Nothing -> continue s
     EvResize w h ->
-      continue (s & dayGrid %~ DayGrid.resize (w,h) & updateDayRange)
+      execCmd s $ dayGrid %= DayGrid.resize (w,h)
     EvMouseDown _ _ BScrollDown _ ->
-      continue (s & dayGrid %~ DayGrid.scroll scrollStep & updateDayRange)
+      execCmd s $ dayGrid %= DayGrid.scroll scrollStep
     EvMouseDown _ _ BScrollUp _ ->
-      continue (s & dayGrid %~ DayGrid.scroll (-scrollStep) & updateDayRange)
+      execCmd s $ dayGrid %= DayGrid.scroll (-scrollStep)
     _ ->
       continue s
 myHandleEvent s (AppEvent ev) =
     execCmd s $ do
       case ev of
         CalendarIO idx -> do
-            zoom (calendar_idx idx) CC.receiveResult
-            log <- zoom (calendar_idx idx) $ CC.fileQuery
-            case log of
-                Just m -> log_message m
-                Nothing -> return ()
+            forCalendar idx CC.receiveResult
+            forCalendar idx CC.fileQuery
             c <- use (calendar_idx idx)
             s'' <- get
             dayGrid %= (DayGrid.resizeDays $ day2widget s'')
@@ -429,13 +436,13 @@ myHandleEvent s (AppEvent ev) =
             log_message (cmd ++ " error: " ++ msg)
 
 myHandleEvent s (MouseDown (WNDay d) BLeft _ _) =
-      continue (s & dayGrid %~ DayGrid.setFocus d & focusItem .~ Just 0 & updateDayRange)
+      execCmd s $ do dayGrid %= DayGrid.setFocus d ; focusItem .= Just 0
 myHandleEvent s (MouseDown (WNDayItem d idx) BLeft _ _) =
-      continue (s & dayGrid %~ DayGrid.setFocus d & focusItem .~ Just idx & updateDayRange)
+      execCmd s $ do dayGrid %= DayGrid.setFocus d ; focusItem .= Just idx
 myHandleEvent s (MouseDown _ BScrollDown _ _) =
-      continue (s & dayGrid %~ DayGrid.scroll scrollStep & updateDayRange)
+      execCmd s $ do dayGrid %= DayGrid.scroll scrollStep
 myHandleEvent s (MouseDown _ BScrollUp _ _) =
-      continue (s & dayGrid %~ DayGrid.scroll (-scrollStep) & updateDayRange)
+      execCmd s $ do dayGrid %= DayGrid.scroll (-scrollStep)
 myHandleEvent s (MouseDown _ _ _ _) = continue s
 myHandleEvent s (MouseUp _ _ _) = continue s
 
@@ -457,20 +464,6 @@ day2widget st day =
       focus = st^.dayGrid^.DayGrid.focusDay
       reminders = runReader (getReminders day) st
 
-updateDayRange :: St -> St
-updateDayRange = execState $ do
-    m <- use mode
-    updateDayRange' (m == AMAppend)
-
-updateDayRange' :: Monad m => Bool -> StateT St m ()
-updateDayRange' force = do
-    -- get currently visible day range
-    day_range <- fmap DayGrid.rangeVisible $ use dayGrid
-    forEachCalendar $ embed $ CC.setRangeVisible day_range
-    -- TODO: why do we need this here?
-    s <- get
-    dayGrid %= (DayGrid.resizeDays $ day2widget s)
-
 emptyReminderEditor :: Brick.Editor String WidgetName
 emptyReminderEditor =
     (Brick.editor WNNewReminder (Just 1) "")
@@ -490,28 +483,17 @@ testmain = do
   chan <- newBChan (1 + length raw_calendars)
   let day_grid = (DayGrid.init WNDayGrid today)
   let day_range = DayGrid.rangeVisible day_grid
-  (log,cals_loaded) <- fmap unzip $ forM (zip [0..] raw_calendars) (\(i,(t,raw_c)) ->
+  cals_loaded <- forM (zip [0..] raw_calendars) (\(i,(t,raw_c)) ->
     do
     cal <- rightOrDie $ CC.fromConfig (writeBChan chan (CalendarIO i)) raw_c
     cal' <- cal
-    (msg, cal'') <- runStateT (do embed (CC.setRangeVisible day_range); CC.fileQuery) cal'
-    now <- getCurrentTime
-    return (fmap ((,) now) msg, (t,cal''))
-    )
+    return (t,cal'))
   tz <- getCurrentTimeZone
-  customMain buildVty (Just chan) mainApp
-    (AppState
-        False
-        day_grid
-        (Just 0)
-        cals_loaded
-        (mapMaybe id log)
-        AMNormal
-        emptyReminderEditor
-        chan
-        tz
-        (-8)
-        )
+  let initial_state = AppState False day_grid day_range (Just 0) cals_loaded
+                        [] AMNormal emptyReminderEditor chan tz (-8)
+  bootup_state <- flip execStateT initial_state $
+    forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)
+  customMain buildVty (Just chan) mainApp initial_state
   return ()
 
 rightOrDie :: Either String a -> IO a
