@@ -494,7 +494,7 @@ testmain = do
                         [] AMNormal emptyReminderEditor chan tz (-8)
   bootup_state <- flip execStateT initial_state $
     forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)
-  customMain buildVty (Just chan) mainApp initial_state
+  customMain buildVty (Just chan) mainApp bootup_state
   return ()
 
 rightOrDie :: Either String a -> IO a
