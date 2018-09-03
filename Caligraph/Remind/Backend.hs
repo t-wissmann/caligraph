@@ -8,6 +8,7 @@ import Caligraph.Utils
 
 import Data.Either
 import Data.Maybe
+import Data.List.Utils (replace)
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
@@ -177,6 +178,10 @@ rebuildPtrStore :: (Eq i, Hashable i) => [CB.Item i] -> P.PointerStore i
 rebuildPtrStore items =
     execState (mapM (P.lookupOrInsert . CB.identifier) items) P.empty
 
+escapeLiterateString :: String -> String
+escapeLiterateString =
+    replace "\"" "\\\"" . replace "\\" "\\\\"
+
 reminderTemplate :: CB.PartialReminder -> String
 reminderTemplate prem =
     execWriter $ do
@@ -188,7 +193,7 @@ reminderTemplate prem =
                 tell $ printf " DURATION %d:%02d" h m)
         forM_ (CB.prUntil prem) (\(day,intval) ->
                 tell $ printf " *%d UNTIL %s" intval (show day))
-        tell $ " MSG " ++ CB.prTitle prem ++ "\n"
+        tell $ " MSG [\"" ++ escapeLiterateString (CB.prTitle prem) ++ "\"]\n"
 
 
 handleEvent :: CB.Event Event -> CB.BackendM St Event ()
