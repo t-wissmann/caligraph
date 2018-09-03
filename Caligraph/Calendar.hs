@@ -56,7 +56,7 @@ zoomBackend state_action = do
     calState .= new_st
     forM_ new_actions (\i ->
         case i of
-            CB.BAQuery q -> calOpenQueries %= (:) q
+            CB.BAQuery q -> calOpenQueries %= flip (++) [q]
             CB.BAError r -> tell [r])
     return r
 
