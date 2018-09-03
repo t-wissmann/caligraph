@@ -397,7 +397,7 @@ myHandleEvent s (VtyEvent e) =
         AMAppend ->
           case (key,mods) of
             (KEsc,[]) ->
-              continue (s & mode .~ AMNormal)
+              execCmd s $ mode .= AMNormal
             (KEnter,[]) ->
               execCmd s $ do
                   editor <- use newReminderEditor
@@ -405,7 +405,8 @@ myHandleEvent s (VtyEvent e) =
                   mode .= AMNormal
                   addReminderFromString (head (getEditContents editor))
             _ ->
-              continue =<< (handleEventLensed s newReminderEditor Brick.handleEditorEvent (EvKey key mods))
+                handleEventLensed s newReminderEditor Brick.handleEditorEvent (EvKey key mods)
+                >>= flip execCmd (return ())
         AMNormal ->
           case Map.lookup (mods,key) binds of
             Just cmd ->
