@@ -1,0 +1,59 @@
+SET SaveTrig $NumTrig
+SET easter EASTERDATE(YEAR(TODAY()))
+#REM [TRIGGER(easter-46)] MSG %"Aschermittwoch (Stille Tage)%"
+#REM [TRIGGER(easter-7)] MSG %"Palmsontag%"
+#OMIT [TRIGGER(easter-3)] MSG %"Gründonnerstag (Stille Tage)%"
+#OMIT [TRIGGER(easter-2)] MSG %"Karfreitag (Stille Tage)%"
+#REM [TRIGGER(easter-1)] MSG %"Karsamstag (Stille Tage)%"
+#OMIT [TRIGGER(easter)] MSG %"Ostern (Stille Tage)%"
+#REM [TRIGGER(easter+1)] MSG %"Ostermontag%"
+#OMIT [TRIGGER(easter+39)] MSG %"Christi Himmelfahrt%"
+#OMIT [TRIGGER(easter+49)] MSG %"Pfingsten (Stille Tage)%"
+#OMIT [TRIGGER(easter+50)] MSG %"Pfingstmontag%"
+#OMIT [TRIGGER(easter+60)] MSG %"Fronleichnam%"
+
+REM [TRIGGER(easter-46)] MSG %"Aschermittwoch%"
+REM [TRIGGER(easter-7)] MSG %"Palmsontag%"
+OMIT [TRIGGER(easter-3)] MSG %"Gründonnerstag%"
+OMIT [TRIGGER(easter-2)] MSG %"Karfreitag%"
+REM [TRIGGER(easter-1)] MSG %"Karsamstag%"
+OMIT [TRIGGER(easter)] MSG %"Ostern%"
+OMIT [TRIGGER(easter+1)] MSG %"Ostermontag%"
+OMIT [TRIGGER(easter+39)] MSG %"Christi Himmelfahrt%"
+OMIT [TRIGGER(easter+49)] MSG %"Pfingsten%"
+OMIT [TRIGGER(easter+50)] MSG %"Pfingstmontag%"
+OMIT [TRIGGER(easter+60)] MSG %"Fronleichnam%"
+# Some holidays are omitted, some are not.  You may want to change
+# which ones are omitted - use the general forms shown below.
+# You'll need the _back() function and the Week_n variables defined
+# way up in the file.
+
+OMIT     Jan  1   MSG %"Neujahrstag%"
+OMIT     Jan  6   MSG %"Heilige Drei Könige%"
+#REM      Feb 14   MSG %"Valentinstag%"
+#REM      Apr  1   MSG %"April Fool's%" Day
+OMIT     May  1   MSG %"Tag der Arbeit%"
+REM     Sun May 8 MSG %"Muttertag%" # zweiter maisonntag
+OMIT     Oct  3   MSG %"Tag der Deutschen Einheit%"
+REM      Oct 31   MSG %"Reformationstag%"
+REM      Aug  15   MSG %"Mariä Himmelfahrt%"
+#REM      Dec 24   MSG %"Heilig Abend (Stille Tage)%"
+OMIT      Nov  1   MSG %"Allerheiligen%"
+REM      Dec 24   MSG %"Heilig Abend%"
+OMIT     Dec 25   MSG %"1. Weihnachtstag%"
+OMIT     Dec 26   MSG %"2. Weihnachtstag%"
+REM  Wed Nov 25 --7 MSG %"Buß- und Bettag%"
+#REM  Sun Dec 25 --42 MSG %"Volkstrauertag (Stille Tage)%"
+#REM  Sun Dec 25 --35 MSG %"Totensonntag (Stille Tage)%"
+REM  Sun Dec 25 --42 MSG %"Volkstrauertag%"
+REM  Sun Dec 25 --35 MSG %"Totensonntag%"
+
+REM Sun Dec 25 --28 MSG 1. Advent
+REM Sun Dec 25 --21 MSG 2. Advent
+REM Sun Dec 25 --14 MSG 3. Advent
+REM Sun Dec 25 --7 MSG 4. Advent
+
+if $NumTrig > SaveTrig
+    REM SPECIAL SHADE 220
+endif  
+
