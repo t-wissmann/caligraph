@@ -548,6 +548,11 @@ setFocus :: Day -> St n -> St n
 setFocus d st =
     st & focusDay .~ d
 
+modifyFocus :: (Day -> Day) -> St n -> St n
+modifyFocus f st =
+  st & focusDay %~ f
+     & scrollToFocus
+
 -- | update the focused cell s.t. it is in the view
 moveFocusIntoView :: St n -> St n
 moveFocusIntoView st = st

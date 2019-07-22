@@ -145,6 +145,10 @@ binds = Map.fromList
   , (([MCtrl], KChar 'u'), dayGrid %= DayGrid.scrollPage (-0.45))
   , (([MCtrl], KChar 'f'), dayGrid %= DayGrid.scrollPage 0.90)
   , (([MCtrl], KChar 'b'), dayGrid %= DayGrid.scrollPage (-0.90))
+  , (([], KChar '['), focus_month_relative_cmd (-1))
+  , (([], KChar ']'), focus_month_relative_cmd 1)
+  , (([], KChar '{'), focus_month_relative_cmd (-12))
+  , (([], KChar '}'), focus_month_relative_cmd 12)
   -- , (([], KChar '$'), shell_cmd "~/.reminders.d/bla.sh")
   , (([], KChar '$'), shell_cmd "~/.reminders.d/mkpdf.sh")
   , (([], KChar 'X'), toggle_log_cmd)
@@ -173,6 +177,10 @@ log_message msg = do
 toggle_log_cmd :: Cmd St
 toggle_log_cmd =
     showLogLines %= (*) (-1)
+
+focus_month_relative_cmd :: Integer -> Cmd St
+focus_month_relative_cmd diff = do
+    dayGrid %= DayGrid.modifyFocus (addGregorianMonthsClip diff)
 
 focus_cmd :: Dir -> Cmd St
 focus_cmd dir = do
