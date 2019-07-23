@@ -211,57 +211,66 @@ render :: (Ord n, Show n)
   -- ^- Internal State
   -> Widget n
   -- ^ Rendered widget
-render st =
-  reportExtent (st^.widgetName) $
+render st_ =
+  reportExtent (st_^.widgetName) $
   Widget Greedy Greedy render'
   where
     mapHead _ [] = []
     mapHead f (x:xs) = (f x:xs)
-    rc = (st^.rowController)
     render' = do
       w' <- asks (view availWidthL)
       h' <- asks (view availHeightL)
+      let st = case (st_^.size) of
+                 Just _ ->
+                   -- if we know the size already don't guess the RowController
+                   st_
+                 Nothing ->
+                   -- but when rendering for the first time, guess the RowController
+                   -- to avoid flickering
+                   st_ { _rowController = widthToRowController w' }
       let (fullwidth,height) = snd renderHeaderRows (w',h')
       Brick.Types.render $
         computeVisibleRows st (fullwidth,height)
-        & map (renderRow fullwidth)
-        & ((++) $ headerRows fullwidth)
+        & map (renderRow st fullwidth)
+        & ((++) $ headerRows st fullwidth)
         & vBox
-    headerRows :: Int -> [Widget n]
-    headerRows w = (fst renderHeaderRows) (st^.rowController) (st^.focusDay) w
-    -- renderRow :: ScreenRow -> Int -> Widget n
-    renderRow fullwidth (ScreenRow days height ct cb) =
-      let
-        -- if in doubt, have more gap on the left
-        gapLeftWidth = (1 + fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
-        gapLeftWidget = str $ map (const ' ') [1..gapLeftWidth]
-        -- render the empty space at the end of shorter rows
-        renderEmptySpace renderedDays =
-          if length days == (rc^.columns)
-          then renderedDays
-          else
-            let
-              w = ((rc^.tableWidth) fullwidth) - sum (map fst renderedDays)
-              bs = if last ((rc^.previousRow) days) == (st^.focusDay)
-                   then UJ.Strong
-                   else UJ.Normal
-            in
-            renderedDays ++
-              [ (w, forceAttr "cellBorder" $
-                      padBottom Max $
-                      UJ.withLineType bs hBorder
-                      <+> str [UJ.get bs UJ.Empty UJ.Empty bs])]
-      in
-      days
-      & map (\d -> ((rc^.dayWidth) d fullwidth, d))
-      & map (\(width,d) -> (width, snd $ renderDay st width d))
-      & flip (++) [(1, renderRightmostBorder st $ last days)]
-      & renderEmptySpace
-      & map (\(width,d) -> setAvailableSize (width,height) d)
-      & map (cropTopBy ct)
-      & map (cropBottomBy cb)
-      & ((:) gapLeftWidget)
-      & hBox
+    headerRows :: St n -> Int -> [Widget n]
+    headerRows st w = (fst renderHeaderRows) (st^.rowController) (st^.focusDay) w
+
+renderRow :: St n -> Int -> ScreenRow -> Widget n
+renderRow st fullwidth (ScreenRow days height ct cb) =
+  let
+    rc = st^.rowController
+    -- if in doubt, have more gap on the left
+    gapLeftWidth = (1 + fullwidth - fromIntegral ((rc^.tableWidth) fullwidth)) `div` 2
+    gapLeftWidget = str $ map (const ' ') [1..gapLeftWidth]
+    -- render the empty space at the end of shorter rows
+    renderEmptySpace renderedDays =
+      if length days == (rc^.columns)
+      then renderedDays
+      else
+        let
+          w = ((rc^.tableWidth) fullwidth) - sum (map fst renderedDays)
+          bs = if last ((rc^.previousRow) days) == (st^.focusDay)
+               then UJ.Strong
+               else UJ.Normal
+        in
+        renderedDays ++
+          [ (w, forceAttr "cellBorder" $
+                  padBottom Max $
+                  UJ.withLineType bs hBorder
+                  <+> str [UJ.get bs UJ.Empty UJ.Empty bs])]
+  in
+  days
+  & map (\d -> ((rc^.dayWidth) d fullwidth, d))
+  & map (\(width,d) -> (width, snd $ renderDay st width d))
+  & flip (++) [(1, renderRightmostBorder st $ last days)]
+  & renderEmptySpace
+  & map (\(width,d) -> setAvailableSize (width,height) d)
+  & map (cropTopBy ct)
+  & map (cropBottomBy cb)
+  & ((:) gapLeftWidget)
+  & hBox
 
 -- | call this after this widget has been rendered
 updateWidgetSize :: Eq n => St n -> EventM n (St n)
@@ -272,6 +281,7 @@ updateWidgetSize st = do
     Just (Extent _ _ lastsize _) ->
       st
       & size .~ Just ((snd renderHeaderRows) lastsize)
+      & rowController .~ widthToRowController (fst lastsize)
       & return
 
 computeVisibleRows
