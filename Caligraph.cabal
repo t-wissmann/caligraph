@@ -38,6 +38,7 @@ library
     Caligraph.Cli.UnicodeJunction
     Caligraph.Config.Main
     Caligraph.Config.Calendars
+    Caligraph.Config.Command
   build-depends:
       base
     , parsec
