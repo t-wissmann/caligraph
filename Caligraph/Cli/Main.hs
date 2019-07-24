@@ -21,6 +21,7 @@ import Caligraph.Utils
 import Caligraph.Possibly
 import Caligraph.PointerStore (Ptr)
 import qualified Caligraph.Config.Main as MainConfig
+import qualified Caligraph.Config.Command as CCommand
 import qualified Caligraph.Config.Calendars as CalendarConfig
 import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
@@ -164,6 +165,24 @@ binds = Map.fromList
   , (([], KUp   ), focus_cmd DirUp)
   , (([], KRight), focus_cmd DirRight)
   ]
+
+commands :: Map.Map String (CCommand.CommandArgParser (Cmd St))
+commands = Map.fromList
+  [ (,) "quit" $ return quit_cmd
+  , (,) "edit-src" $ return edit_externally_cmd
+  , (,) "add" $ return add_reminder_cmd
+  , (,) "goto-today" $ return (dayGrid %= DayGrid.gotoToday)
+  , (,) "scroll-page" $
+    return (\d -> dayGrid %= DayGrid.scrollPage d) <*> a
+  , (,) "focus-month" $
+    return focus_month_relative_cmd <*> a
+  , (,) "shell" $ return shell_cmd <*> a
+  , (,) "toggle-log" $ return toggle_log_cmd
+  , (,) "focus" $ return focus_cmd <*> a
+  ]
+  where
+    a :: Read x => CCommand.CommandArgParser x
+    a = CCommand.readArg
 
 quit_cmd :: Cmd St
 quit_cmd =

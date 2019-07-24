@@ -5,6 +5,14 @@ import Data.Time.Calendar
 
 data Dir = DirUp | DirDown | DirLeft  | DirRight deriving (Eq,Show)
 
+instance Read Dir where
+    readsPrec _ str = (\x -> [(x,"")]) $
+        if str == "up" then DirUp else
+        if str == "down" then DirDown else
+        if str == "left" then DirLeft else
+        if str == "right" then DirRight else
+        error "a direction is up, down, left, or right"
+
 data CliMode = CMNormal | CMInsert
 
 data WidgetName =
