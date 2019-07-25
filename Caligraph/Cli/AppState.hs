@@ -9,8 +9,10 @@ import qualified Caligraph.Calendar as Calendar
 import qualified Caligraph.Cli.DayGrid as DayGrid
 import qualified Brick.Widgets.Edit as Brick
 import qualified Brick.BChan as Brick
+import Graphics.Vty.Input.Events (Modifier,Key)
 
 import Data.Array
+import qualified Data.Map.Strict as Map
 import Data.Time.Calendar (Day)
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime)
@@ -49,6 +51,7 @@ data AppState = AppState
     , _eventChannel :: Brick.BChan ExternalEvent
     , _timeZone :: TimeZone
     , _showLogLines :: Int -- number of log lines to show
+    , _binds :: Map.Map ([Modifier],Key) (Cmd AppState)
     }
 
 makeLenses ''AppState

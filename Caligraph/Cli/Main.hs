@@ -83,8 +83,8 @@ instance Monoid CmdOutput where
 
 requestSuspendGui = lift breakMonad
 
-binds :: Map.Map ([Modifier],Key) (Cmd St)
-binds = Map.fromList
+bindsInternal :: Map.Map ([Modifier],Key) (Cmd St)
+bindsInternal = Map.fromList
   [ (([], KEsc), quit_cmd)
   , (([], KChar 'q'), quit_cmd)
   , (([], KChar 'e'), edit_externally_cmd)
@@ -384,7 +384,7 @@ myHandleEvent s (VtyEvent e) =
                 handleEventLensed s newReminderEditor Brick.handleEditorEvent (EvKey key mods)
                 >>= flip execCmd (return ())
         AMNormal ->
-          case Map.lookup (mods,key) binds of
+          case Map.lookup (mods,key) (s^.binds) of
             Just cmd ->
                 execCmd s cmd
             Nothing -> continue s
@@ -467,7 +467,7 @@ testmain = do
     return (t,cal'))
   tz <- getCurrentTimeZone
   let initial_state = AppState False day_grid day_range (Just 0) cals_loaded
-                        [] AMNormal emptyReminderEditor chan tz (-8)
+                        [] AMNormal emptyReminderEditor chan tz (-8) bindsInternal
   bootup_state <- flip execStateT initial_state $
     forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)
   customMain buildVty (Just chan) mainApp bootup_state
