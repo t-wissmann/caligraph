@@ -22,6 +22,7 @@ import Caligraph.Breakpoint
 import Caligraph.Possibly
 import Caligraph.PointerStore (Ptr)
 import qualified Caligraph.Config.Main as MainConfig
+import qualified Caligraph.Config.Defaults as ConfigDefaults
 import qualified Caligraph.Config.Command as CCommand
 import qualified Caligraph.Config.Calendars as CalendarConfig
 import qualified Caligraph.Backend.Types as CB
@@ -83,37 +84,37 @@ instance Monoid CmdOutput where
 
 requestSuspendGui = lift breakMonad
 
-bindsInternal :: Map.Map ([Modifier],Key) (Cmd St)
-bindsInternal = Map.fromList
-  [ (([], KEsc), quit_cmd)
-  , (([], KChar 'q'), quit_cmd)
-  , (([], KChar 'e'), edit_externally_cmd)
-  , (([], KChar 'a'), add_reminder_cmd)
-  , (([], KChar 'o'), dayGrid %= DayGrid.gotoToday)
-
-  , (([MCtrl], KChar 'd'), dayGrid %= DayGrid.scrollPage 0.45)
-  , (([MCtrl], KChar 'u'), dayGrid %= DayGrid.scrollPage (-0.45))
-  , (([MCtrl], KChar 'f'), dayGrid %= DayGrid.scrollPage 0.90)
-  , (([MCtrl], KChar 'b'), dayGrid %= DayGrid.scrollPage (-0.90))
-  , (([], KChar '['), focus_month_relative_cmd (-1))
-  , (([], KChar ']'), focus_month_relative_cmd 1)
-  , (([], KChar '{'), focus_month_relative_cmd (-12))
-  , (([], KChar '}'), focus_month_relative_cmd 12)
-  -- , (([], KChar '$'), shell_cmd "~/.reminders.d/bla.sh")
-  , (([], KChar '$'), shell_cmd "~/.reminders.d/mkpdf.sh")
-  , (([], KChar 'X'), toggle_log_cmd)
-
-  -- hjkl
-  , (([], KChar 'h'), focus_cmd DirLeft)
-  , (([], KChar 'j'), focus_cmd DirDown)
-  , (([], KChar 'k'), focus_cmd DirUp)
-  , (([], KChar 'l'), focus_cmd DirRight)
-  -- arrow keys
-  , (([], KLeft ), focus_cmd DirLeft)
-  , (([], KDown ), focus_cmd DirDown)
-  , (([], KUp   ), focus_cmd DirUp)
-  , (([], KRight), focus_cmd DirRight)
-  ]
+--bindsInternal :: Map.Map ([Modifier],Key) (Cmd St)
+--bindsInternal = Map.fromList
+--  [ (([], KEsc), quit_cmd)
+--  , (([], KChar 'q'), quit_cmd)
+--  , (([], KChar 'e'), edit_externally_cmd)
+--  , (([], KChar 'a'), add_reminder_cmd)
+--  , (([], KChar 'o'), dayGrid %= DayGrid.gotoToday)
+--
+--  , (([MCtrl], KChar 'd'), dayGrid %= DayGrid.scrollPage 0.45)
+--  , (([MCtrl], KChar 'u'), dayGrid %= DayGrid.scrollPage (-0.45))
+--  , (([MCtrl], KChar 'f'), dayGrid %= DayGrid.scrollPage 0.90)
+--  , (([MCtrl], KChar 'b'), dayGrid %= DayGrid.scrollPage (-0.90))
+--  , (([], KChar '['), focus_month_relative_cmd (-1))
+--  , (([], KChar ']'), focus_month_relative_cmd 1)
+--  , (([], KChar '{'), focus_month_relative_cmd (-12))
+--  , (([], KChar '}'), focus_month_relative_cmd 12)
+--  -- , (([], KChar '$'), shell_cmd "~/.reminders.d/bla.sh")
+--  , (([], KChar '$'), shell_cmd "~/.reminders.d/mkpdf.sh")
+--  , (([], KChar 'X'), toggle_log_cmd)
+--
+--  -- hjkl
+--  , (([], KChar 'h'), focus_cmd DirLeft)
+--  , (([], KChar 'j'), focus_cmd DirDown)
+--  , (([], KChar 'k'), focus_cmd DirUp)
+--  , (([], KChar 'l'), focus_cmd DirRight)
+--  -- arrow keys
+--  , (([], KLeft ), focus_cmd DirLeft)
+--  , (([], KDown ), focus_cmd DirDown)
+--  , (([], KUp   ), focus_cmd DirUp)
+--  , (([], KRight), focus_cmd DirRight)
+--  ]
 
 commands :: Map.Map String (CCommand.CommandArgParser (Cmd St))
 commands = Map.fromList
@@ -445,9 +446,8 @@ emptyReminderEditor :: Brick.Editor String WidgetName
 emptyReminderEditor =
     (Brick.editor WNNewReminder (Just 1) "")
 
-loadKeyConfig :: FilePath -> IO (Map.Map ([Modifier],Key) (Cmd St))
-loadKeyConfig fp = do
-  src <- MainConfig.getSource fp
+loadKeyConfig :: T.Text -> IO (Map.Map ([Modifier],Key) (Cmd St))
+loadKeyConfig src = do
   kc <- rightOrDie $ fmap MainConfig.globalKeys $ MainConfig.parseKeyConfig src
   binds <- rightOrDie $ fmap Map.fromList $ forM kc (\(k,v) ->
     mapLeft (\s -> "In binding of \"" ++ show k ++ "\" to \"" ++ show v ++ ": " ++ s) $
@@ -469,8 +469,8 @@ testmain = do
   forM_ (HashMap.toList $ MainConfig.environment config) (\(k,v) ->
     setEnv (T.unpack k) (T.unpack v))
   -- load key config
-  customBinds <- MainConfig.keyConfigUserPath >>= loadKeyConfig
-  defaultBinds <- MainConfig.keyConfigDefaultPath >>= loadKeyConfig
+  customBinds <- MainConfig.keyConfigUserPath >>= MainConfig.getSource >>= loadKeyConfig
+  defaultBinds <- loadKeyConfig ConfigDefaults.defaultKeys
   -- load calendar config
   raw_calendars <- CalendarConfig.load >>= rightOrDie
   chan <- newBChan (1 + length raw_calendars)

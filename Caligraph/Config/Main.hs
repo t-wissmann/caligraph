@@ -2,8 +2,6 @@ module Caligraph.Config.Main where
 
 import Caligraph.Utils (mapLeft)
 
-import Paths_Caligraph
-
 import Data.Ini
 import Data.Text (Text, pack, unpack)
 import Data.List.Split (splitOn)
@@ -56,10 +54,6 @@ data KeyConfig = KeyConfig { globalKeys :: [(KeyCombi, [String])] } -- | a mappi
 -- | filepath to user's key config
 keyConfigUserPath :: IO FilePath
 keyConfigUserPath = getUserConfigFile "caligraph" "keys.ini"
-
--- | filepath to the default key config
-keyConfigDefaultPath :: IO FilePath
-keyConfigDefaultPath = getDataFileName "example-config/keys.ini"
 
 parseKeyConfig :: Text -> Either String KeyConfig
 parseKeyConfig src = fmap KeyConfig $ do
