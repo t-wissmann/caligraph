@@ -80,10 +80,6 @@ instance Semigroup CmdOutput where
 instance Monoid CmdOutput where
     mempty = CmdOutput mempty mempty
 
-
-data FgIO a = NoFg a | WithFg (IO a)
-data BgFgIO a = BgFgIO (IO (FgIO a))
-
 data Breakpoint m a = Breakpoint {
     projBreakpoint :: (m (Possibly m a))
   }
@@ -124,11 +120,6 @@ instance MonadIO m => MonadIO (Breakpoint m) where
 
 breakMonad :: Monad m => Breakpoint m ()
 breakMonad = Breakpoint $ return $ Monadic $ return ()
-
---instance Monad BgFgIO where
---  return = BgFgIO
---  (B
-
 
 type Cmd st = StateT st (Breakpoint IO) ()
 
