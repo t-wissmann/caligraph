@@ -6,4 +6,4 @@ import Data.Text
 import Data.FileEmbed
 
 defaultKeys :: Text
-defaultKeys = pack "" -- $(embedStringFile "example-config/keys.ini")
+defaultKeys = $(embedStringFile "example-config/keys.ini")
