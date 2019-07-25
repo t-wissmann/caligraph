@@ -12,6 +12,11 @@ category:            Console
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
+extra-source-files:
+  example-config/keys.ini
+data-files:
+  example-config/keys.ini
+data-dir: .
 
 library
   exposed-modules:
@@ -40,6 +45,8 @@ library
     Caligraph.Config.Main
     Caligraph.Config.Calendars
     Caligraph.Config.Command
+  other-modules:
+    Paths_Caligraph
   build-depends:
       base
     , parsec

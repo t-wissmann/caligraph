@@ -445,6 +445,17 @@ emptyReminderEditor :: Brick.Editor String WidgetName
 emptyReminderEditor =
     (Brick.editor WNNewReminder (Just 1) "")
 
+loadKeyConfig :: FilePath -> IO (Map.Map ([Modifier],Key) (Cmd St))
+loadKeyConfig fp = do
+  src <- MainConfig.getSource fp
+  kc <- rightOrDie $ fmap MainConfig.globalKeys $ MainConfig.parseKeyConfig src
+  binds <- rightOrDie $ fmap Map.fromList $ forM kc (\(k,v) ->
+    mapLeft (\s -> "In binding of \"" ++ show k ++ "\" to \"" ++ show v ++ ": " ++ s) $
+    do
+        cmd <- CCommand.bindFromMap (flip Map.lookup commands) v
+        return (MainConfig.keyCombi k,cmd))
+  return binds
+
 testmain :: IO ()
 testmain = do
   let buildVty = do
@@ -453,13 +464,14 @@ testmain = do
         return v
   today <- DayGrid.getToday
   args <- getArgs
+  -- load main config
   config <- MainConfig.load >>= rightOrDie
   forM_ (HashMap.toList $ MainConfig.environment config) (\(k,v) ->
     setEnv (T.unpack k) (T.unpack v))
-  kc <- fmap MainConfig.globalKeys $ MainConfig.loadKeys >>= rightOrDie
-  customBinds <- rightOrDie $ fmap Map.fromList $ forM kc (\(k,v) -> do
-    cmd <- CCommand.bindFromMap (flip Map.lookup commands) v
-    return (MainConfig.keyCombi k,cmd))
+  -- load key config
+  customBinds <- MainConfig.keyConfigUserPath >>= loadKeyConfig
+  defaultBinds <- MainConfig.keyConfigDefaultPath >>= loadKeyConfig
+  -- load calendar config
   raw_calendars <- CalendarConfig.load >>= rightOrDie
   chan <- newBChan (1 + length raw_calendars)
   let day_grid = (DayGrid.init WNDayGrid today)
@@ -472,7 +484,7 @@ testmain = do
   tz <- getCurrentTimeZone
   let initial_state = AppState False day_grid day_range (Just 0) cals_loaded
                         [] AMNormal emptyReminderEditor chan tz (-8)
-                        (Map.union customBinds bindsInternal)
+                        (Map.union customBinds defaultBinds)
   bootup_state <- flip execStateT initial_state $
     forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)
   customMain buildVty (Just chan) mainApp bootup_state

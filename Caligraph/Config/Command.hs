@@ -5,6 +5,7 @@
 
 module Caligraph.Config.Command where
 
+import Caligraph.Utils (mapLeft)
 import Control.Monad (ap)
 import Text.Read (readEither)
 import Text.Printf (printf)
@@ -30,7 +31,10 @@ instance Monad CommandArgParser where
             return (l >>= a_to_mb))
 
 readArg :: Read a => CommandArgParser a
-readArg = MandatoryArgument (\s -> fmap return $ readEither s)
+readArg = MandatoryArgument
+    (\s -> fmap return $
+           mapLeft (\_ -> "Invalid Token \"" ++ s ++ "\"") $
+           readEither s)
 
 
 -- | bind and parse the arguments to obtain sth of target type
