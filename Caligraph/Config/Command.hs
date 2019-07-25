@@ -13,6 +13,7 @@ import Text.Printf (printf)
 data CommandArgParser target
     = NoMoreArguments target
     | MandatoryArgument (String -> Either String (CommandArgParser target))
+    -- | OptionalArgument (Maybe String -> Either String (CommandArgParser target))
 
 instance Functor CommandArgParser where
     fmap f (NoMoreArguments p) = NoMoreArguments $ f p
@@ -29,6 +30,10 @@ instance Monad CommandArgParser where
         MandatoryArgument (\s -> do
             l <- (f s)
             return (l >>= a_to_mb))
+    -- (OptionalArgument f) >>= a_to_mb =
+    --     OptionalArgument (\s -> do
+    --         l <- (f s)
+    --         return (l >>= a_to_mb))
 
 readArg :: Read a => CommandArgParser a
 readArg = MandatoryArgument
@@ -36,6 +41,18 @@ readArg = MandatoryArgument
            mapLeft (\_ -> "Invalid Token \"" ++ s ++ "\"") $
            readEither s)
 
+readPlainString :: CommandArgParser String
+readPlainString = MandatoryArgument
+    (\s -> return $ return s)
+
+-- readStringTokens :: CommandArgParser [String]
+-- readStringTokens = OptionalArgument
+--     (\s -> case s of
+--            Nothing -> Right $ NoMoreArguments []
+--            Just x -> Right $ do
+--              rest <- readStringTokens
+--              return (x:rest)
+--            )
 
 -- | bind and parse the arguments to obtain sth of target type
 bind :: CommandArgParser target -> [String] -> Either String target
@@ -53,6 +70,13 @@ bind = bindCount 0
     bindCount n (MandatoryArgument clos) (x:xs) = do
         nextParser <- clos x
         bindCount (n+1) nextParser xs
+    -- bindCount n (OptionalArgument clos) args =
+    --     let (maybe_x,xs) = case args of
+    --                        [] -> (Nothing, [])
+    --                        (x:xs') -> (Just x, xs')
+    --     in do
+    --     nextParser <- clos maybe_x
+    --     bindCount (n+1) nextParser xs
 
 bindFromMap :: (String -> Maybe (CommandArgParser target)) -> [String] -> Either String target
 bindFromMap lookup command =

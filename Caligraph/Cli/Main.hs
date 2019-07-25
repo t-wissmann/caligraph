@@ -125,7 +125,7 @@ commands = Map.fromList
     return (\d -> dayGrid %= DayGrid.scrollPage d) <*> a
   , (,) "focus-month" $
     return focus_month_relative_cmd <*> a
-  , (,) "shell" $ return shell_cmd <*> a
+  , (,) "shell" $ return shell_cmd <*> CCommand.readPlainString
   , (,) "toggle-log" $ return toggle_log_cmd
   , (,) "focus" $ return focus_cmd <*> a
   ]
