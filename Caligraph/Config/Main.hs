@@ -13,6 +13,7 @@ import System.Environment.XDG.BaseDir
 import Control.Exception
 import Control.Monad
 import System.IO.Error
+import Data.Char
 import Graphics.Vty.Input.Events (Modifier, Key(KChar,KFun))
 import Text.Read
 import qualified Data.List.Split as Split
@@ -89,6 +90,9 @@ instance Read PrettyKey where
                 then [KChar (str !! 0)]
                 else
                     case str of
+                    ('@':intStr) -> do
+                        (keycode,_) <- readsPrec 0 intStr
+                        return $ KChar $ chr keycode
                     ('F':intStr) -> do
                         (int,_) <- readsPrec 0 intStr
                         return $ KFun int
