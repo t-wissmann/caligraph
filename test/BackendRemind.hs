@@ -35,6 +35,6 @@ templateTest =
         (Just (3,4))
         (Just (fromGregorian 2018 11 12, 9)))
     =!=
-    "REM 2018-01-02 AT 8:00 DURATION 3:04 *9 UNTIL 2018-11-12 MSG test\n")
+    "REM 2018-01-02 AT 8:00 DURATION 3:04 *9 UNTIL 2018-11-12 MSG [\"test\"]\n")
 
 
