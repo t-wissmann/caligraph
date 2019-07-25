@@ -84,6 +84,7 @@ test-suite Caligraph-test
                      , Utils
                      , BackendUtils
                      , BackendRemind
+                     , Config
   build-depends:       base
                      , Caligraph
                      , mtl

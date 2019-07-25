@@ -9,6 +9,7 @@ import LazyResultSpec
 import Utils
 import BackendUtils
 import BackendRemind
+import Config
 
 main :: IO ()
 main = do
@@ -21,3 +22,4 @@ main = do
         testUtils
         testBackendUtils
         testBackendRemind
+        testConfig
