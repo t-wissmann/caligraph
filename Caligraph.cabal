@@ -18,6 +18,7 @@ library
     Caligraph.Utils
     Caligraph.Lib
     Caligraph.Possibly
+    Caligraph.Breakpoint
     Caligraph.PointerStore
     Caligraph.Backend.Types
     Caligraph.Backend.Utils
@@ -60,6 +61,7 @@ library
     , directory
     , filepath
     , xdg-basedir
+    , transformers
     , process
     , unordered-containers
     , hashable

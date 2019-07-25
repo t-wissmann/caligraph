@@ -4,6 +4,7 @@ module Caligraph.Cli.AppState where
 
 import Caligraph.Backend.Types as CB
 import Caligraph.Cli.Types
+import Caligraph.Breakpoint
 import qualified Caligraph.Calendar as Calendar
 import qualified Caligraph.Cli.DayGrid as DayGrid
 import qualified Brick.Widgets.Edit as Brick
@@ -33,6 +34,8 @@ data ExternalEvent
     | ProcessOutput String String
     | ProcessError String String
     -- ^ one of the subprocesses finished
+
+type Cmd st = StateT st (Breakpoint IO) ()
 
 data AppState = AppState
     { _aboutToQuit :: Bool
