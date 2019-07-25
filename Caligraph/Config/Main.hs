@@ -3,11 +3,13 @@ module Caligraph.Config.Main where
 import Caligraph.Utils (mapLeft)
 
 import Data.Ini
-import Data.Text (Text, pack)
+import Data.Text (Text, pack, unpack)
+import Data.List.Split (splitOn)
 import qualified Data.Text.IO as T
 import qualified Data.HashMap.Strict as M
 import System.Environment.XDG.BaseDir
 import Control.Exception
+import Control.Monad
 import System.IO.Error
 import Graphics.Vty.Input.Events (Modifier, Key(KChar,KFun))
 import Text.Read
@@ -19,6 +21,13 @@ data Config = Config {
 
 type SectionParser a = M.HashMap Text Text -> Either String a
 
+getSource :: String -> IO Text
+getSource path = handle readHandler $ T.readFile path
+readHandler :: IOError -> IO Text
+readHandler e
+  | isDoesNotExistError e = return $ pack ""
+  | otherwise = ioError e
+
 load :: IO (Either String Config)
 load = do
     path <- getUserConfigFile "caligraph" "config.ini"
@@ -28,13 +37,6 @@ load = do
         let section = parseSection ini
         return Config
           <*> parseSection ini "environment" parseEnvironment
-    where
-      getSource :: String -> IO Text
-      getSource path = handle readHandler $ T.readFile path
-      readHandler :: IOError -> IO Text
-      readHandler e
-        | isDoesNotExistError e = return $ pack ""
-        | otherwise = ioError e
 
 parseSection :: Ini -> String -> SectionParser a -> Either String a
 parseSection (Ini ini) sec_name parser =
@@ -46,6 +48,21 @@ parseSection (Ini ini) sec_name parser =
 
 parseEnvironment :: SectionParser (M.HashMap Text Text)
 parseEnvironment = Right
+
+data KeyConfig = KeyConfig { globalKeys :: [(KeyCombi, [String])] } -- | a mapping of strings to commands
+
+loadKeys :: IO (Either String KeyConfig)
+loadKeys = do
+    path <- getUserConfigFile "caligraph" "keys.ini"
+    src <- getSource path
+    return $ fmap KeyConfig $ do
+        ini <- parseIni src
+        let sec = maybe [] id $ fmap M.toList $ M.lookup (pack "") (unIni ini)
+        forM sec (\(key,value) -> do
+            keyParsed <- mapLeft (\_ -> "Invalid key combi " ++ unpack key)
+                         (readEither $ unpack key)
+            let command = splitOn " " (unpack value)
+            return (keyParsed :: KeyCombi, command :: [String]))
 
 data PrettyKey = PrettyKey { prettyKey :: Key } deriving (Eq,Ord)
 

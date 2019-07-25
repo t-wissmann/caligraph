@@ -50,6 +50,15 @@ bind = bindCount 0
         nextParser <- clos x
         bindCount (n+1) nextParser xs
 
+bindFromMap :: (String -> Maybe (CommandArgParser target)) -> [String] -> Either String target
+bindFromMap lookup command =
+    case command of
+    [] -> Left "No command given"
+    (cmd:args) ->
+        case lookup cmd of
+        Nothing -> Left $ "No such command: \"" ++ cmd ++ "\""
+        Just parser -> bind parser args
+
 -- to test suite
 noArgs :: IO ()
 noArgs = return ()
