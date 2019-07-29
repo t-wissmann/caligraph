@@ -22,6 +22,7 @@ import Brick.Widgets.Border.Style
 
 import Data.Time.Calendar (Day,addDays,diffDays)
 import Data.Time.Clock (getCurrentTime)
+import Data.Time (addUTCTime)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.LocalTime (utcToLocalTime, getCurrentTimeZone,localDay)
 
@@ -166,8 +167,10 @@ getToday :: IO Day
 getToday = do
   g <- getCurrentTime
   tz <- getCurrentTimeZone
-  return $ localDay $ utcToLocalTime tz g
-
+  return $ localDay
+         $ utcToLocalTime tz
+         -- $ addUTCTime (9 * 60 * 60 + 30 * 60) -- for debugging only
+         $ g
 
 -- | reander the header rows
 renderHeaderRows

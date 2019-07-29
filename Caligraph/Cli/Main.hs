@@ -58,7 +58,7 @@ import qualified Data.HashMap.Strict as HashMap
 import System.Exit
 import System.IO
 import System.Environment (getArgs,setEnv)
-import Control.Concurrent (forkIO)
+import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MVar
 
 import System.Process
@@ -412,6 +412,8 @@ myHandleEvent s (AppEvent ev) =
             log_message (cmd ++ ": " ++ msg)
         ProcessError cmd msg ->
             log_message (cmd ++ " error: " ++ msg)
+        DayChanged today' -> do
+            dayGrid . DayGrid.today .= today'
 
 myHandleEvent s (MouseDown (WNDay d) BLeft _ _) =
       execCmd s $ do dayGrid %= DayGrid.setFocus d ; focusItem .= Just 0
@@ -456,6 +458,14 @@ loadKeyConfig src = do
         return (MainConfig.keyCombi k,cmd))
   return binds
 
+-- | given the current day, run the specific action whenever everytime day changes
+reportDayChangeThread :: (Day -> IO ()) -> Day -> IO ()
+reportDayChangeThread action today = do
+    threadDelay (5 * 1000 * 1000) -- wait for 5 seconds
+    today' <- DayGrid.getToday -- get the new day
+    when (today /= today') (action today')
+    reportDayChangeThread action today' -- repeat it
+
 testmain :: IO ()
 testmain = do
   let buildVty = do
@@ -482,6 +492,7 @@ testmain = do
     cal' <- cal
     return (t,cal'))
   tz <- getCurrentTimeZone
+  forkIO $ reportDayChangeThread (writeBChan chan . DayChanged) today
   let initial_state = AppState False day_grid day_range (Just 0) cals_loaded
                         [] AMNormal emptyReminderEditor chan tz (-8)
                         (Map.union customBinds defaultBinds)

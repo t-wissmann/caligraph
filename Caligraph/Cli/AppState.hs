@@ -36,6 +36,8 @@ data ExternalEvent
     | ProcessOutput String String
     | ProcessError String String
     -- ^ one of the subprocesses finished
+    | DayChanged Day
+    -- ^ the date has changed
 
 type Cmd st = StateT st (Breakpoint IO) ()
 
