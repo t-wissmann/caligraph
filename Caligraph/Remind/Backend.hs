@@ -221,6 +221,9 @@ handleEvent (CB.AddReminder pr) = do
         appendFile path' $ reminderTemplate pr
         fmap FileContent $ load config
 
+wakeUpLoop :: CB.WakeUpLoop Event
+wakeUpLoop _ = return ()
+
 backend :: CB.Backend St Event
 backend = CB.Backend
     { CB.cachedIncarnations = (\st ->
@@ -228,7 +231,7 @@ backend = CB.Backend
         $ CB.query_items (fromMaybe [] (stItems st)))
     , CB.create = (\vals -> do
         conf <- parseConfig vals
-        return $ St conf Nothing P.empty)
+        return $ (St conf Nothing P.empty, wakeUpLoop))
     , CB.handleEvent = handleEvent
     , CB.itemSource = (\ptr -> do
         location <- zoom stIdStore $ P.resolve ptr

@@ -48,6 +48,7 @@ library
     , parsec
     , brick
     , time
+    , fsnotify
     , vty
     , containers
     , microlens
@@ -64,6 +65,7 @@ library
     , split
     , directory
     , filepath
+    , system-fileio
     , xdg-basedir
     , transformers
     , process

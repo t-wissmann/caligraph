@@ -79,6 +79,7 @@ data BackendQuery a = BackendQuery
 data BackendAction a =
       BAQuery (BackendQuery a)
     | BAError LogLine
+    | BALog LogLine
 
 type BackendM state event a = StateT state (Writer [BackendAction event]) a
 
@@ -95,8 +96,10 @@ data Event event =
     | AddReminder PartialReminder
     | Response event
 
+type WakeUpLoop event = (event -> IO ()) -> IO ()
+
 data Backend state event = Backend
-  { create :: (String -> Maybe String) -> Either String state
+  { create :: (String -> Maybe String) -> Either String (state, WakeUpLoop event)
   , cachedIncarnations :: state -> (Day,Day) -> Incarnations'
   , handleEvent :: Event event -> BackendM state event ()
   , itemSource :: Ptr -> BackendM state event (ItemSource event)

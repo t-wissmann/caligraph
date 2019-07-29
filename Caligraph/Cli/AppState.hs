@@ -32,6 +32,8 @@ data AppMode
 data ExternalEvent
     = CalendarIO Int
     -- ^ a calendar io for the i'th calendar
+    | CalendarWakeUp Int
+    -- ^ the i'th calendar gets waken up
     | ProcessFinished String ExitCode
     | ProcessOutput String String
     | ProcessError String String

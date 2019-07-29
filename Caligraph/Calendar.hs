@@ -28,6 +28,7 @@ import Lens.Micro.TH
 import Lens.Micro.Mtl
 
 import Control.Concurrent.MVar
+import Control.Concurrent.Chan
 import Control.Concurrent
 
 data RawCalendar stateType eventType = RawCalendar
@@ -36,6 +37,7 @@ data RawCalendar stateType eventType = RawCalendar
     , _calOpenQueries :: [CB.BackendQuery eventType]
     , _calMVarQuery :: MVar (IO eventType)
     , _calMVarResult :: MVar eventType
+    , _calWakeUpChan :: Chan eventType -- channel for sending wakeup events
     , _calWaitingForResult :: Bool
     , _calWorker :: ThreadId
     }
@@ -57,7 +59,8 @@ zoomBackend state_action = do
     forM_ new_actions (\i ->
         case i of
             CB.BAQuery q -> calOpenQueries %= flip (++) [q]
-            CB.BAError r -> tell [r])
+            CB.BAError r -> tell ["Error: " ++ r]
+            CB.BALog r -> tell [r])
     return r
 
 zoomBackendEvent :: Monad m => (CB.Event q) -> StateT (RawCalendar s q) (WriterT [LogLine] m) ()
@@ -71,20 +74,24 @@ doCalendar computation = do
     put (Calendar rc')
     return r
 
-fromConfig :: IO () -> Conf.CalendarConfig -> Either String (IO Calendar)
-fromConfig noticeDataReady cc = do
+fromConfig :: IO () -> IO () -> Conf.CalendarConfig -> Either String (IO Calendar)
+fromConfig noticeDataReady noticeWakeUp cc = do
     (_,CBR.SomeBackend be) <- maybe (Left $ "No backend named \"" ++ bet ++ "\"") Right $
         find ((==) bet . fst) CBR.backends
-    state <- CB.create be getOption
+    (state,wakeUpLoop) <- CB.create be getOption
     return $ do
         args <- newEmptyMVar
         results <- newEmptyMVar
+        wakeUpChan <- newChan
+        forkIO $ wakeUpLoop (\event -> do
+            noticeWakeUp
+            writeChan wakeUpChan event)
         thread <- forkIO $ forever $ do
             action <- takeMVar args
             r <- action
             noticeDataReady
             putMVar results r
-        return $ Calendar $ RawCalendar state be [] args results False thread
+        return $ Calendar $ RawCalendar state be [] args results wakeUpChan False thread
     where
         bet = Conf.backendType cc
         getOption :: String -> Maybe String
@@ -119,6 +126,12 @@ receiveResult = doCalendar $ do
         res <- liftIO $ takeMVar mv
         calWaitingForResult .= False
         zoomBackendEvent $ CB.Response res
+
+receiveWakeUp :: MonadIO io => CalendarT io ()
+receiveWakeUp = doCalendar $ do
+    chan <- use calWakeUpChan
+    event <- liftIO $ readChan chan
+    zoomBackendEvent $ CB.Response event
 
 editExternally :: MonadIO io => Ptr -> CalendarT io ()
 editExternally ptr = doCalendar $ do

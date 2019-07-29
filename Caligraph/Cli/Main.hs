@@ -406,6 +406,10 @@ myHandleEvent s (AppEvent ev) =
             c <- use (calendar_idx idx)
             s'' <- get
             dayGrid %= (DayGrid.resizeDays $ day2widget s'')
+        CalendarWakeUp idx -> do
+            forCalendar idx CC.receiveWakeUp
+            s'' <- get
+            dayGrid %= (DayGrid.resizeDays $ day2widget s'')
         ProcessFinished cmd exitCode ->
             log_message (cmd ++ " finished with " ++ show exitCode)
         ProcessOutput cmd msg ->
@@ -483,12 +487,12 @@ testmain = do
   defaultBinds <- loadKeyConfig ConfigDefaults.defaultKeys
   -- load calendar config
   raw_calendars <- CalendarConfig.load >>= rightOrDie
-  chan <- newBChan (1 + length raw_calendars)
+  chan <- newBChan (10 + 2 * length raw_calendars)
   let day_grid = (DayGrid.init WNDayGrid today)
   let day_range = DayGrid.rangeVisible day_grid
   cals_loaded <- forM (zip [0..] raw_calendars) (\(i,(t,raw_c)) ->
     do
-    cal <- rightOrDie $ CC.fromConfig (writeBChan chan (CalendarIO i)) raw_c
+    cal <- rightOrDie $ CC.fromConfig (writeBChan chan (CalendarIO i)) (writeBChan chan (CalendarWakeUp i)) raw_c
     cal' <- cal
     return (t,cal'))
   tz <- getCurrentTimeZone
