@@ -293,7 +293,7 @@ drawUI st =
         & (forceAttr ("log" <> "border") hBorder <=>)
 
 drawStatusLine st = withAttr "statusline" $
-    hBox (L.intersperse (str " ") $ map drawCalendarName (st^.calendars))
+    hBox (map drawCalendarName (st^.calendars))
     <+>
     (padLeft BT.Max $ (str $ range_visible_str))
   where
@@ -301,7 +301,8 @@ drawStatusLine st = withAttr "statusline" $
       let (from,to) = DayGrid.rangeVisible $ (st^.dayGrid)
       in show from ++ " to " ++ show to
     drawCalendarName (name,cal) =
-      txt name <+> (str $ if CC.openQueryCount cal > 0 then "+" else " ")
+      withAttr ("calendar" <> attrName (T.unpack name)) $
+      str " " <+> txt name <+> (str $ if CC.openQueryCount cal > 0 then "+" else " ")
 
 getReminders :: Monad m => Day -> ReaderT St m [CB.Incarnation (Int,Ptr)]
 getReminders day =
@@ -334,7 +335,8 @@ mainApp =
             myHandleEvent s' ev
         )
       , appStartEvent = (\s -> tryEnableMouse >> return s)
-      , appAttrMap = const $ attrMap defAttr
+      , appAttrMap = (\s ->
+        attrMap defAttr $
         [ ("cellBorder", fg white)
         , ("cellHeader", yellow `on` black)
         , ("cellHeaderFocus", yellow `on` black)
@@ -350,7 +352,13 @@ mainApp =
         , ("log" <> "border", fg black)
         , ("log" <> "timestamp", fg white)
         , ("log" <> "message", defAttr)
-        ]
+        ] ++
+          do
+            (name,cal) <- _calendars s
+            let calcfg = CC.calendarConfig cal
+            let attr = (CalendarConfig.colorInv calcfg) `on` (CalendarConfig.color calcfg)
+            return ("calendar" <> attrName (T.unpack name), attr)
+        )
       }
 
 scrollStep = 3

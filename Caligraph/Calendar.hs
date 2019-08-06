@@ -40,6 +40,7 @@ data RawCalendar stateType eventType = RawCalendar
     , _calWakeUpChan :: Chan eventType -- channel for sending wakeup events
     , _calWaitingForResult :: Bool
     , _calWorker :: ThreadId
+    , _calConfig :: Conf.CalendarConfig
     }
 
 makeLenses ''RawCalendar
@@ -49,6 +50,9 @@ data Calendar = forall stateType eventType.
 
 type CalendarT m a = StateT Calendar (WriterT [LogLine] m) a
 type CalendarM a = CalendarT Identity a
+
+calendarConfig :: Calendar -> Conf.CalendarConfig
+calendarConfig (Calendar c) = _calConfig c
 
 openQueryCount :: Calendar -> Int
 openQueryCount (Calendar c) =
@@ -103,7 +107,7 @@ fromConfig noticeDataReady noticeWakeUp cc = do
             r <- action
             noticeDataReady
             putMVar results r
-        return $ Calendar $ RawCalendar state be [] args results wakeUpChan False thread
+        return $ Calendar $ RawCalendar state be [] args results wakeUpChan False thread cc
     where
         bet = Conf.backendType cc
         getOption :: String -> Maybe String
