@@ -37,14 +37,16 @@ import Lens.Micro.Mtl
 import Lens.Micro.TH
 import Debug.Trace
 
+type Year = Integer
+
 -- basically parse the output of  remind -r -s -l file month year
 data St = St
     { _path :: String -- a filepath with tilde not yet expanded
     , _pathNewReminders :: String -- a filepath with tilde not yet expanded
-    , _monthCache :: M.Map Month (CB.Incarnations')
-    -- ^ mapping a month to the full array for all days of that month
-    , _cacheMisses :: M.Map Month Bool
-    -- ^ map whether a missing month has already been requested
+    , _yearCache :: M.Map Year (CB.Incarnations')
+    -- ^ mapping a year to the full array for all incarnations
+    , _cacheMisses :: M.Map Year Bool
+    -- ^ map whether a missing year has already been requested
     , _idStore :: PS.PointerStore SourceLocation
     -- ^ if the config has just been created
     }
@@ -52,7 +54,7 @@ data St = St
 makeLenses ''St
 
 data Event =
-    MonthData Month [CB.Incarnation SourceLocation] (ExitCode,String)
+    YearData Integer [CB.Incarnation SourceLocation] (ExitCode,String)
     | FileSystem Bool FilePath -- some update from the file system, and whether this file currently exists
     | FlushCache
     | Nop -- dummy event
@@ -77,6 +79,10 @@ monthRange (year,m) =
     ( fromGregorian year m 1
     , addDays (-1) $ fromGregorian year' m' 1
     )
+--
+-- get the first and the last day of the given year
+yearRange :: Year -> (Day,Day)
+yearRange year = (fromGregorian year 1 1, fromGregorian year 12 31)
 
 -- | return a list of months in the given range
 monthsCovered :: (Day,Day) -> [Month]
@@ -91,15 +97,23 @@ monthsCovered (from,to) =
           $ iterate nextMonth
           $ nextMonth (from_y,from_m)
 
+-- | return a list of years in the given range
+yearsCovered :: (Day,Day) -> [Year]
+yearsCovered (from,to) = [from_y..to_y]
+  where
+    (from_y,_,_) = toGregorian from
+    (to_y,_,_) = toGregorian to
+
+
 cachedIncarnations :: St -> (Day,Day) -> CB.Incarnations'
 cachedIncarnations st (from,to) =
   A.array (from,to)
   $ takeWhile (\(d,_) -> d <= to)
   $ dropWhile (\(d,_) -> d < from)
-  $ flip concatMap (monthsCovered (from,to))
-  $ (\m ->
-     fromMaybe (map (flip (,) []) $ range $ monthRange m)
-     (fmap A.assocs (M.lookup m (_monthCache st)))
+  $ flip concatMap (yearsCovered (from,to))
+  $ (\y ->
+     fromMaybe (map (flip (,) []) $ range $ yearRange y)
+     (fmap A.assocs (M.lookup y (_yearCache st)))
      )
 
 wakeUpLoop :: St -> CB.WakeUpLoop Event
@@ -141,26 +155,31 @@ parseConfig cfg =
             return (state, wakeUpLoop state)
         Nothing -> Left "Mandatory setting 'path' missing"
 
-requestMonth :: FilePath -> Month -> IO Event
-requestMonth tilde_path (y,month) =
+requestYear :: FilePath -> Integer -> IO Event
+requestYear tilde_path (y) =
   if y < 1990 || y > 2075 then
-    return $ MonthData (y,month) [] (ExitFailure 1, "remind only supports years from 1990 to 2075") 
+    let msg = "remind only supports years from 1990 to 2075" in
+    return $ YearData y [] (ExitFailure 1, msg)
   else do
     filepath <- liftIO $ expandTilde tilde_path
-    let mon_name = month_names !! (month-1)
     let rem = "remind"
-    let rem_args = ["-r", "-s", "-l", filepath, mon_name, show y]
+    -- every year covers at most 54 weeks: 52 weeks entirely in the year,
+    -- one week with the year before, and one week with the next year
+    let rem_args = ["-r", "-s+55", "-l", filepath, "Jan", show y]
     (exitCode,raw_output,raw_error) <- liftIO $ readProcessWithExitCode rem rem_args ""
-    let days_in_month = parseRemOutput raw_output
-    return $ MonthData (y,month) (map snd days_in_month) (exitCode,raw_error)
+    let printedIncarnations = parseRemOutput raw_output
+    let getYear = (\(x,_,_) -> x) . toGregorian
+    let corretYear = (\(day,incarn) ->  y == getYear day)
+    let incarnationsInYear = filter corretYear printedIncarnations
+    return $ YearData y (map snd incarnationsInYear) (exitCode,raw_error)
 
 handleEvent :: CB.Event Event -> CB.BackendM St Event ()
 handleEvent (CB.SetRangeVisible days) = do
-  mc <- use monthCache
+  yc <- use yearCache
   misses <- use cacheMisses
-  forM_ (monthsCovered days) $ \m -> do
-    when (not (m `M.member` mc) && not (m `M.member` misses)) $
-      cacheMisses %= M.insert m False
+  forM_ (yearsCovered days) $ \y -> do
+    when (not (y `M.member` yc) && not (y `M.member` misses)) $
+      cacheMisses %= M.insert y False
 
 handleEvent (CB.AddReminder pr) = do
   tilde_path <- use pathNewReminders
@@ -172,9 +191,9 @@ handleEvent (CB.AddReminder pr) = do
 
 handleEvent (CB.Response (FlushCache)) = do
   tell [CB.BALog $ "Flushing cache"]
-  mc <- use monthCache
-  forM_ (M.keys mc) $ \m -> do
-      cacheMisses %= M.insert m False
+  yc <- use yearCache
+  forM_ (M.keys yc) $ \y -> do
+      cacheMisses %= M.insert y False
 
 handleEvent (CB.Response (Nop)) = return ()
 
@@ -184,24 +203,25 @@ handleEvent (CB.Response (FileSystem exists filepath)) =
            >> handleEvent (CB.Response (FlushCache))
       else tell [CB.BALog $ "File " ++ filepath ++ " removed"]
 
-handleEvent (CB.Response (MonthData m days (exitCode,stderr))) = do
+handleEvent (CB.Response (YearData y days (exitCode,stderr))) = do
   days' <- flip mapM days $ \inc -> do
     ptr <- zoom idStore $ PS.lookupOrInsert (CB.itemId inc)
     return (CB.day inc, inc { CB.itemId = ptr})
-  cacheMisses %= M.delete m
-  monthCache %= M.insert m ((A.accumArray (flip (:)) [] (monthRange m) days') :: CB.Incarnations')
+  cacheMisses %= M.delete y
+  yearCache %= M.insert y ((A.accumArray (flip (:)) [] (yearRange y) days') :: CB.Incarnations')
   when ("" /= stderr) $ tell [CB.BAError stderr]
   return ()
 
-requestMissingMonths :: CB.BackendM St Event ()
-requestMissingMonths = do
+requestMissingYears :: CB.BackendM St Event ()
+requestMissingYears = do
   tilde_path <- use path
   cm <- use cacheMisses
-  cm' <- flip M.traverseWithKey cm (\m v -> do
+  cm' <- flip M.traverseWithKey cm (\y v -> do
     -- if v is not True, then we don't have a request for it yet
     unless v $
-        CB.callback ("Requesting month " ++ showMonth m) $
-            requestMonth tilde_path m
+        CB.callback ("Requesting year " ++ show y) $
+            requestYear tilde_path y
+    -- we set the value of this year to True
     return True)
   cacheMisses .= cm'
 
@@ -215,7 +235,7 @@ backend = CB.Backend
     return $ CB.ExistingFile location Nop)
   , CB.handleEvent = (\ev -> do
       handleEvent ev
-      requestMissingMonths
+      requestMissingYears
       )
   }
 

@@ -498,7 +498,7 @@ testmain = do
   tz <- getCurrentTimeZone
   forkIO $ reportDayChangeThread (writeBChan chan . DayChanged) today
   let initial_state = AppState False day_grid day_range (Just 0) cals_loaded
-                        [] AMNormal emptyReminderEditor chan tz (-8)
+                        [] AMNormal emptyReminderEditor chan tz (-20)
                         (Map.union customBinds defaultBinds)
   bootup_state <- flip execStateT initial_state $
     forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)
