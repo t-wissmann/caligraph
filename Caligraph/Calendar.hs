@@ -61,14 +61,17 @@ zoomBackend state_action = do
     st <- use calState
     let ((r,new_st),new_actions) = runWriter (runStateT (state_action be) st)
     calState .= new_st
+    -- first back up entire old queye
     backupQueue <- use calOpenQueries
     calOpenQueries .= []
+    -- put all the new items in front of the new queue (in correct order)
     forM_ new_actions (\i ->
         case i of
             CB.BAQuery newQuery ->
               calOpenQueries %= (\oldQueue -> oldQueue ++ [newQuery])
             CB.BAError r -> tell ["Error: " ++ r]
             CB.BALog r -> tell [r])
+    -- append the old elements of the previous queue
     calOpenQueries %= flip (++) backupQueue
     return r
 
