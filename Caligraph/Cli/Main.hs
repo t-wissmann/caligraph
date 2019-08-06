@@ -260,7 +260,7 @@ drawUI st =
   [vBox $ mapMaybe id
       [ Just $ DayGrid.render (st^.dayGrid)
       , logWindow
-      , Just $ status_line
+      , Just $ drawStatusLine st
       , Just $ input_line
       ]
   ]
@@ -269,9 +269,6 @@ drawUI st =
     reminders = runReader (getReminders day) st
     idx = (fromMaybe $ length reminders - 1) $ st^.focusItem
     focused_calendar_idx = if (idx >= 0 && idx < length reminders) then fst $ CB.itemId (reminders !! idx) else (-1)
-    status_line = withAttr "statusline"
-        $ padRight BT.Max $ (str $ show $ DayGrid.rangeVisible $ (st^.dayGrid))
-            <+> str (' ':show focused_calendar_idx)
     input_line = withAttr "inputline"
       $ padRight BT.Max
       $ str
@@ -293,6 +290,17 @@ drawUI st =
         & reverse
         & vBox
         & (forceAttr ("log" <> "border") hBorder <=>)
+
+drawStatusLine st = withAttr "statusline" $
+    hBox (L.intersperse (str " ") $ map drawCalendarName (st^.calendars))
+    <+>
+    (padLeft BT.Max $ (str $ range_visible_str))
+  where
+    range_visible_str =
+      let (from,to) = DayGrid.rangeVisible $ (st^.dayGrid)
+      in show from ++ " to " ++ show to
+    drawCalendarName (name,cal) =
+      txt name <+> (str $ if CC.openQueryCount cal > 0 then "+" else " ")
 
 getReminders :: Monad m => Day -> ReaderT St m [CB.Incarnation (Int,Ptr)]
 getReminders day =

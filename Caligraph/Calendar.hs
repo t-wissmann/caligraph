@@ -50,6 +50,11 @@ data Calendar = forall stateType eventType.
 type CalendarT m a = StateT Calendar (WriterT [LogLine] m) a
 type CalendarM a = CalendarT Identity a
 
+openQueryCount :: Calendar -> Int
+openQueryCount (Calendar c) =
+  length (c^.calOpenQueries)
+  + if (c^.calWaitingForResult) then 1 else 0
+
 zoomBackend :: Monad m => (CB.Backend s q -> CB.BackendM s q a) -> StateT (RawCalendar s q) (WriterT [LogLine] m) a
 zoomBackend state_action = do
     be <- use calBackend
