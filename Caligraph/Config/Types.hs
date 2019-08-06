@@ -7,6 +7,7 @@ import Text.Read
 import qualified Data.List.Split as Split
 
 import Graphics.Vty.Input.Events (Modifier, Key(KChar,KFun))
+import Graphics.Vty.Attributes
 
 data PrettyKey = PrettyKey { prettyKey :: Key } deriving (Eq,Ord)
 
@@ -62,4 +63,45 @@ instance Read KeyCombi where
                     modsM <- mapM (readsPrec 0) (reverse mods)
                     (key,_) <- readsPrec 0 keyStr
                     return (fmap (prettyModifier . fst) modsM, prettyKey key)
+
+data PrettyColor = PrettyColor { prettyColor :: Color }
+
+colornames :: [(Color,String)]
+colornames =
+  [ (,) black "black"
+  , (,) red "red"
+  , (,) green "green"
+  , (,) yellow "yellow"
+  , (,) blue "blue"
+  , (,) magenta "magenta"
+  , (,) cyan "cyan"
+  , (,) white "white"
+  , (,) brightBlack "brightblack"
+  , (,) brightRed "brightred"
+  , (,) brightGreen "brightgreen"
+  , (,) brightYellow "brightyellow"
+  , (,) brightBlue "brightblue"
+  , (,) brightMagenta "brightmagenta"
+  , (,) brightCyan "brightcyan"
+  , (,) brightWhite "brightwhite"
+  ]
+
+findlist :: Eq a => [(a,b)] -> a -> Maybe b
+findlist [] _ = Nothing
+findlist ((a,b):xs) a' =
+  if a == a' then Just b else findlist xs a'
+
+instance Show PrettyColor where
+  show (PrettyColor color) =
+    case findlist colornames color of
+      Just s -> s
+      Nothing -> "UnknownColor"
+
+instance Read PrettyColor where
+  readsPrec _ str = fmap (\c -> (PrettyColor c, "")) $
+    case findlist (map swap colornames) str of
+      Just color -> return color
+      Nothing -> []
+    where swap (a,b) = (b,a)
+
 
