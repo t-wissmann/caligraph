@@ -66,6 +66,10 @@ read_only computation = do
 callback :: String -> IO event -> BackendM state event ()
 callback txt io_action = tell [BAQuery $ BackendQuery txt io_action]
 
+-- | a callback that can be dropped if there are too many callbacks
+callbackDroppable :: String -> event -> IO event -> BackendM state event ()
+callbackDroppable txt onDrop io_action = tell [BAQueryDroppable (BackendQuery txt io_action) onDrop]
+
 parseNonNegative :: (Read a, Num a) => GenParser Char st a
 parseNonNegative = read <$> many1 digit
 

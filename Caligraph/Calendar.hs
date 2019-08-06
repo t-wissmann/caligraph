@@ -17,7 +17,7 @@ import Control.Monad.Writer
 import Control.Monad.Reader
 import Control.Monad.Identity
 import qualified Data.Text as T
-import Data.List (find)
+import Data.List (find, splitAt)
 import Data.Time.Calendar (Day)
 
 import Data.Array
@@ -34,18 +34,29 @@ import Control.Concurrent
 data RawCalendar stateType eventType = RawCalendar
     { _calState :: stateType
     , _calBackend :: CB.Backend stateType eventType
-    , _calOpenQueries :: [CB.BackendQuery eventType]
+    , _calOpenMandatoryQueries :: [CB.BackendQuery eventType]
+    -- ^-- mandatory and more important queries (usually: writes)
+    --  -- they form a queue
+    , _calOpenDroppableQueries :: [(CB.BackendQuery eventType, eventType)]
+    -- ^ optional and possibly droppable queries if there are too many (usually: reads)
+    --  they form a stack. If a query gets dropped, the eventType data is sent
+    --  back to the backend
     , _calMVarQuery :: MVar (IO eventType)
     , _calMVarResult :: MVar eventType
     , _calWakeUpChan :: Chan eventType -- channel for sending wakeup events
     , _calWaitingForResult :: Bool
     , _calWorker :: ThreadId
+    , _calConfig :: Conf.CalendarConfig
     }
 
 makeLenses ''RawCalendar
 
 data Calendar = forall stateType eventType.
         Calendar (RawCalendar stateType eventType)
+
+
+calendarConfig :: Calendar -> Conf.CalendarConfig
+calendarConfig (Calendar c) = _calConfig c
 
 type CalendarT m a = StateT Calendar (WriterT [LogLine] m) a
 type CalendarM a = CalendarT Identity a
@@ -56,12 +67,30 @@ zoomBackend state_action = do
     st <- use calState
     let ((r,new_st),new_actions) = runWriter (runStateT (state_action be) st)
     calState .= new_st
+    oldQueries <- use calOpenDroppableQueries 
+    calOpenDroppableQueries .= [] -- clear it for the moment
     forM_ new_actions (\i ->
         case i of
-            CB.BAQuery q -> calOpenQueries %= flip (++) [q]
+            CB.BAQueryDroppable q a ->
+              calOpenDroppableQueries %= flip (++) [(q,a)]
+            CB.BAQuery q ->
+              -- append to the back
+              calOpenMandatoryQueries %= flip (++) [q]
             CB.BAError r -> tell ["Error: " ++ r]
             CB.BALog r -> tell [r])
+    calOpenDroppableQueries %= flip (++) oldQueries -- add old queries at the end again
     return r
+
+-- | remove droppable queries from the queue if there are too many
+-- and inform the backend about it
+trimDroppableQueries :: Monad m => StateT (RawCalendar s q) (WriterT [LogLine] m) ()
+trimDroppableQueries = do
+  cfg <- use calConfig
+  oldQueue <- use calOpenDroppableQueries
+  let (newQueue, dropped) = splitAt (Conf.maxIoQueries cfg) oldQueue
+  calOpenDroppableQueries .= newQueue
+  forM_ dropped (\(_,event) -> zoomBackendEvent $ CB.Response event)
+
 
 zoomBackendEvent :: Monad m => (CB.Event q) -> StateT (RawCalendar s q) (WriterT [LogLine] m) ()
 zoomBackendEvent ev = zoomBackend (\be -> CB.handleEvent be ev)
@@ -91,7 +120,7 @@ fromConfig noticeDataReady noticeWakeUp cc = do
             r <- action
             noticeDataReady
             putMVar results r
-        return $ Calendar $ RawCalendar state be [] args results wakeUpChan False thread
+        return $ Calendar $ RawCalendar state be [] [] args results wakeUpChan False thread cc
     where
         bet = Conf.backendType cc
         getOption :: String -> Maybe String
@@ -106,17 +135,30 @@ cachedIncarnations (Calendar c) range =
 
 fileQuery :: MonadIO io => CalendarT io ()
 fileQuery = doCalendar $ do
+    trimDroppableQueries
     waiting <- use calWaitingForResult
-    queue <- use calOpenQueries
-    when (not waiting) $
-        case queue of
-            [] -> return ()
-            ((CB.BackendQuery msg action):queue') -> do
+    when (not waiting) $ do
+        maybe_query <- extractNextQuery
+        case maybe_query of
+            Nothing -> return ()
+            Just (CB.BackendQuery msg action) -> do
                 mv <- use calMVarQuery
                 liftIO $ putMVar mv action
                 calWaitingForResult .= True
-                calOpenQueries .= queue'
                 tell [msg]
+    where
+      extractNextQuery :: Monad m => StateT (RawCalendar s q) m (Maybe (CB.BackendQuery q))
+      extractNextQuery = do
+        queueMand <- use calOpenMandatoryQueries
+        queueDrop <- use calOpenDroppableQueries
+        case (queueMand,queueDrop) of
+          ((x:xs),_) -> do -- extract from mandatory queries first
+            calOpenMandatoryQueries .= xs
+            return (Just x)
+          ([],((x,_):xs)) -> do -- otherwise take from droppable queries
+            calOpenDroppableQueries .= xs
+            return (Just x)
+          ([],[]) -> return Nothing
 
 receiveResult :: MonadIO io => CalendarT io ()
 receiveResult = doCalendar $ do
@@ -147,5 +189,4 @@ editExternally ptr = doCalendar $ do
 
 addReminder :: Monad m => CB.PartialReminder -> CalendarT m ()
 addReminder pr = doCalendar $ zoomBackendEvent $ CB.AddReminder pr
-
 

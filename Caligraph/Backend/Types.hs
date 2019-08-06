@@ -78,6 +78,8 @@ data BackendQuery a = BackendQuery
 
 data BackendAction a =
       BAQuery (BackendQuery a)
+    | BAQueryDroppable (BackendQuery a) a
+      -- ^ a droppable query, together with an action if it gets dropped
     | BAError LogLine
     | BALog LogLine
 

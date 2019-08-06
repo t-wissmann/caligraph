@@ -56,6 +56,7 @@ data Event =
     | FileSystem Bool FilePath -- some update from the file system, and whether this file currently exists
     | FlushCache
     | Nop -- dummy event
+    | MonthRequestDropped Month -- if the month request has been dropped
 
 
 nextMonth :: Month -> Month
@@ -193,6 +194,10 @@ handleEvent (CB.Response (MonthData m days (exitCode,stderr))) = do
   when ("" /= stderr) $ tell [CB.BAError stderr]
   return ()
 
+handleEvent (CB.Response (MonthRequestDropped m)) = do
+  tell [CB.BALog $ "Request for month " ++ showMonth m ++ " dropped."]
+  cacheMisses %= M.delete m
+
 requestMissingMonths :: CB.BackendM St Event ()
 requestMissingMonths = do
   tilde_path <- use path
@@ -200,8 +205,10 @@ requestMissingMonths = do
   cm' <- flip M.traverseWithKey cm (\m v -> do
     -- if v is not True, then we don't have a request for it yet
     unless v $
-        CB.callback ("Requesting month " ++ showMonth m) $
-            requestMonth tilde_path m
+        CB.callbackDroppable
+          ("Requesting month " ++ showMonth m)
+          (MonthRequestDropped m)
+          (requestMonth tilde_path m)
     return True)
   cacheMisses .= cm'
 

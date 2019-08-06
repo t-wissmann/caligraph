@@ -8,9 +8,11 @@ import Data.Text
 import Data.Text.IO as T
 import Data.Ini
 import System.Environment.XDG.BaseDir
+import Text.Read
 
 data CalendarConfig = CalendarConfig
     { backendType :: String
+    , maxIoQueries :: Int -- maximal number of io queries
     , allSettings :: HashMap Text Text
     }
 
@@ -31,8 +33,14 @@ load = do
 
 parseCalendar :: SectionParser CalendarConfig
 parseCalendar section =
-    return CalendarConfig <*> f "type" <*> pure section
+    return CalendarConfig <*> f "type" <*> withDefault "max-io-queries" 10 <*> pure section
     where f = field section
+          withDefault key defaultValue =
+            case M.lookup (pack key) section of
+                Nothing ->
+                    Right defaultValue
+                Just v ->
+                    readEither (unpack v)
 
 field :: HashMap Text Text -> String -> Either String String
 field section key =
