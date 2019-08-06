@@ -22,6 +22,7 @@ import Caligraph.Breakpoint
 import Caligraph.Possibly
 import Caligraph.PointerStore (Ptr)
 import qualified Caligraph.Config.Main as MainConfig
+import qualified Caligraph.Config.Types as CfgTypes
 import qualified Caligraph.Config.Defaults as ConfigDefaults
 import qualified Caligraph.Config.Command as CCommand
 import qualified Caligraph.Config.Calendars as CalendarConfig
@@ -471,7 +472,7 @@ loadKeyConfig src = do
     mapLeft (\s -> "In binding of \"" ++ show k ++ "\" to \"" ++ show v ++ ": " ++ s) $
     do
         cmd <- CCommand.bindFromMap (flip Map.lookup commands) v
-        return (MainConfig.keyCombi k,cmd))
+        return (CfgTypes.keyCombi k,cmd))
   return binds
 
 -- | given the current day, run the specific action whenever everytime day changes
