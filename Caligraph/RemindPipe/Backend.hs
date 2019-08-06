@@ -142,7 +142,10 @@ parseConfig cfg =
         Nothing -> Left "Mandatory setting 'path' missing"
 
 requestMonth :: FilePath -> Month -> IO Event
-requestMonth tilde_path (y,month) = do
+requestMonth tilde_path (y,month) =
+  if y < 1990 || y > 2075 then
+    return $ MonthData (y,month) [] (ExitFailure 1, "remind only supports years from 1990 to 2075") 
+  else do
     filepath <- liftIO $ expandTilde tilde_path
     let mon_name = month_names !! (month-1)
     let rem = "remind"
