@@ -61,11 +61,15 @@ zoomBackend state_action = do
     st <- use calState
     let ((r,new_st),new_actions) = runWriter (runStateT (state_action be) st)
     calState .= new_st
+    backupQueue <- use calOpenQueries
+    calOpenQueries .= []
     forM_ new_actions (\i ->
         case i of
-            CB.BAQuery q -> calOpenQueries %= flip (++) [q]
+            CB.BAQuery newQuery ->
+              calOpenQueries %= (\oldQueue -> oldQueue ++ [newQuery])
             CB.BAError r -> tell ["Error: " ++ r]
             CB.BALog r -> tell [r])
+    calOpenQueries %= flip (++) backupQueue
     return r
 
 zoomBackendEvent :: Monad m => (CB.Event q) -> StateT (RawCalendar s q) (WriterT [LogLine] m) ()
