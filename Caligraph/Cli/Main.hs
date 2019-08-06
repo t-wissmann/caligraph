@@ -238,11 +238,15 @@ runMessageWriter msg prog = do
 
 forEachCalendar :: MonadIO m => CC.CalendarT m a -> StateT St m [a]
 forEachCalendar prog = do
-    runMessageWriter id (zoom calendars $ forState $ zoom _2 $ prog)
+    cals <- use calendars
+    let indices = take (length cals) [0..]
+    mapM (\i -> forCalendar i prog) indices
 
 forCalendar :: MonadIO m => Int -> CC.CalendarT m a -> StateT St m a
 forCalendar idx prog = do
-    runMessageWriter id (zoom (calendar_idx idx) prog)
+    cals <- use calendars
+    let prependCalName str = (T.unpack $ fst $ cals !! idx) ++ ": " ++ str
+    runMessageWriter prependCalName (zoom (calendar_idx idx) prog)
 
 fixFocusItem :: Monad m => StateT St m ()
 fixFocusItem = do
