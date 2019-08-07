@@ -301,8 +301,15 @@ drawStatusLine st = withAttr "statusline" $
       let (from,to) = DayGrid.rangeVisible $ (st^.dayGrid)
       in show from ++ " to " ++ show to
     drawCalendarName (name,cal) =
-      withAttr ("calendar" <> attrName (T.unpack name) <> "filled") $
-      str "▏" <+> txt name <+> (str $ if CC.openQueryCount cal > 0 then "+" else " ")
+        (withAttr ("calendar" <> attrName (T.unpack name) <> "separator")
+          (str "▏")
+          -- (str "▎")
+          )
+        <+>
+        (withAttr ("calendar" <> attrName (T.unpack name) <> "filled") $
+          txt name
+          <+>
+          (str $ if CC.openQueryCount cal > 0 then "+" else " "))
 
 getReminders :: Monad m => Day -> ReaderT St m [CB.Incarnation (Int,Ptr)]
 getReminders day =
@@ -360,6 +367,7 @@ mainApp =
             let prefix = attrName "calendar" <> attrName (T.unpack name)
             [ (prefix <> "filled", attr),
               (prefix <> "text", fg (CalendarConfig.color calcfg)),
+              (prefix <> "separator", black `on` (CalendarConfig.color calcfg)),
               (prefix <> "textSelected", (CalendarConfig.color calcfg) `on` black) ]
         )
       }
