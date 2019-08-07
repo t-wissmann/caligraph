@@ -302,7 +302,7 @@ drawStatusLine st = withAttr "statusline" $
       in show from ++ " to " ++ show to
     drawCalendarName (name,cal) =
       withAttr ("calendar" <> attrName (T.unpack name) <> "filled") $
-      str " " <+> txt name <+> (str $ if CC.openQueryCount cal > 0 then "+" else " ")
+      str "▏" <+> txt name <+> (str $ if CC.openQueryCount cal > 0 then "+" else " ")
 
 getReminders :: Monad m => Day -> ReaderT St m [CB.Incarnation (Int,Ptr)]
 getReminders day =
