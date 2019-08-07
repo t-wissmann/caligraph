@@ -301,7 +301,7 @@ drawStatusLine st = withAttr "statusline" $
       let (from,to) = DayGrid.rangeVisible $ (st^.dayGrid)
       in show from ++ " to " ++ show to
     drawCalendarName (name,cal) =
-      withAttr ("calendar" <> attrName (T.unpack name)) $
+      withAttr ("calendar" <> attrName (T.unpack name) <> "filled") $
       str " " <+> txt name <+> (str $ if CC.openQueryCount cal > 0 then "+" else " ")
 
 getReminders :: Monad m => Day -> ReaderT St m [CB.Incarnation (Int,Ptr)]
@@ -357,7 +357,10 @@ mainApp =
             (name,cal) <- _calendars s
             let calcfg = CC.calendarConfig cal
             let attr = (CalendarConfig.colorInv calcfg) `on` (CalendarConfig.color calcfg)
-            return ("calendar" <> attrName (T.unpack name), attr)
+            let prefix = attrName "calendar" <> attrName (T.unpack name)
+            [ (prefix <> "filled", attr),
+              (prefix <> "text", fg (CalendarConfig.color calcfg)),
+              (prefix <> "textSelected", (CalendarConfig.color calcfg) `on` black) ]
         )
       }
 
@@ -458,12 +461,13 @@ day2widget st day =
             (if focus == day && (st^.mode) == AMNormal
               then Just $ fromMaybe (length reminders - 1) (st^.focusItem)
               else Nothing)
-            (map (fmap snd) reminders)
+            reminders
             day
             today
             (case (st^.mode, focus==day) of
                 (AMAppend,True) -> Just (st^.newReminderEditor)
-                _ -> Nothing))
+                _ -> Nothing)
+            (st^.calendars))
     where
       today = st^.dayGrid^.DayGrid.today
       focus = st^.dayGrid^.DayGrid.focusDay

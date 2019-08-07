@@ -7,6 +7,8 @@ import Caligraph.Cli.Types
 import Caligraph.Utils
 import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
+import Caligraph.PointerStore (Ptr)
+import Caligraph.Calendar as CC
 
 import Brick
 import Brick.Main
@@ -28,19 +30,20 @@ import Data.Array
 
 data St = St
     { focus :: Maybe Int -- if this day has the keyboard focus
-    , reminders :: [CB.Incarnation']
+    , reminders :: [CB.Incarnation (Int,Ptr)]
     , day :: Day
     , today :: Day
     , newReminderEditor :: Maybe (Brick.Editor String WidgetName)
+    , calendars :: [(T.Text,CC.Calendar)]
     }
 
 
-reminder2widget :: Int -> CB.Incarnation' -> Int -> (Int, Widget n)
-reminder2widget idx r width =
+reminder2widget :: AttrName -> Int -> CB.Incarnation' -> Int -> (Int, Widget n)
+reminder2widget calendarAttr idx r width =
     ( length lines
-    , withAttr "reminderTitle"
+    , withAttr (attrName "reminderTitle")
       $ vBox
-      $ map (\(d,s) -> (withAttr "reminderTime" $ str d) <+> txt s)
+      $ map (\(d,s) -> (withAttr (calendarAttr <> attrName "text") $ str d) <+> txt s)
       $ zip placeholder lines
     )
   where
@@ -86,8 +89,8 @@ reminder2widget idx r width =
                 [CB.showTime ':' (h,m) ]
             (_, _) -> []
 
-reminder2widgetInline :: Int -> CB.Incarnation' -> Int -> (Int, Widget n)
-reminder2widgetInline idx r width =
+reminder2widgetInline :: AttrName -> Int -> CB.Incarnation' -> Int -> (Int, Widget n)
+reminder2widgetInline calendarAttr idx r width =
     ( length formatted_lines
     , withAttr "reminderTitle"
       $ vBox formatted_lines
@@ -133,7 +136,7 @@ reminder2widgetInline idx r width =
 -- | return a widget for a day and its total height
 day2widget :: St -> DayWidget WidgetName
 day2widget st width =
-    (reminders st)
+    reminders st
     & zipWith (\i d -> widget i d width) [0..]
     & intersperse (1, str $ replicate width ' ') -- put empty lines in between
     & (if (null $ reminders st) then (:) focusIndicator else id)
@@ -153,8 +156,10 @@ day2widget st width =
             c <- getContext
             return $ emptyResult & imageL .~ (V.charFill (c^.attrL) ch (c^.availWidthL) (c^.availHeightL))
 
-      widget :: Int -> CB.Incarnation' -> Int -> (Int, Widget WidgetName)
-      widget idx inc w=
+      widget :: Int -> CB.Incarnation (Int,Ptr) -> Int -> (Int, Widget WidgetName)
+      widget idx inc w =
+        let calName = T.unpack $ fst $ (calendars st) !! (fst (CB.itemId inc)) in
+        let attr = attrName "calendar" <> attrName calName in
         (if Just idx == (focus st)
         then (\(a,b) ->
             ( a
@@ -162,18 +167,19 @@ day2widget st width =
                 $ updateAttrMap
                     (mapAttrNames [ ("selectedReminderTime", "reminderTime")
                                   , ("selectedReminderTitle", "reminderTitle")
+                                  , (attr <> "textSelected", attr <> "text")
                                   ])
                 $ b
             ))
         else id)
         $ (\(a,b) -> (a, clickable (WNDayItem (day st) idx) b))
         (if width < 20
-        then reminder2widgetInline idx inc w
-        else reminder2widget idx inc w)
+        then reminder2widgetInline attr idx (fmap snd inc) w
+        else reminder2widget attr idx (fmap snd inc) w)
       headerAttr
         | (isJust $ focus $ st) && (day st == today st) = "cellHeaderFocusToday"
         | (isJust $ focus $ st)  = "cellHeaderFocus"
-        | (day st == today st)           = "cellHeaderToday"
+        | (day st == today st)   = "cellHeaderToday"
         | otherwise              = "cellHeader"
       (y,_,_) = toGregorian (day st)
       (y_now,_,_) = toGregorian (today st)
@@ -198,4 +204,3 @@ day2widget st width =
                  $ str
                  $ replicate width ' ')
         else (1, emptyWidget)
-
