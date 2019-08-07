@@ -130,6 +130,7 @@ commands = Map.fromList
   , (,) "shell" $ return shell_cmd <*> CCommand.readPlainString
   , (,) "toggle-log" $ return toggle_log_cmd
   , (,) "focus" $ return focus_cmd <*> a
+  , (,) "cycle-calendar" $ return cycle_calendar_focus_cmd
   ]
   where
     a :: Read x => CCommand.CommandArgParser x
@@ -181,6 +182,12 @@ focus_cmd dir = do
                 then Right $ focusItemConcrete + 1
                 else Left (Just 0)
 
+cycle_calendar_focus_cmd :: Cmd St
+cycle_calendar_focus_cmd = do
+  count <- fmap length $ use calendars
+  idx <- use calendarFocused
+  calendarFocused .= (idx + 1) `mod` count
+
 -- | Execute the given line in the shell
 shell_cmd :: String -> Cmd St
 shell_cmd cmd = do
@@ -228,7 +235,8 @@ addReminderFromString buf = do
     day <- use (dayGrid . DayGrid.focusDay)
     let (from,duration,title) = CB.parseTimeDuration buf
     let pr = CB.PartialReminder day title from duration Nothing
-    forCalendar 0 (CC.addReminder pr)
+    idx <- use calendarFocused
+    forCalendar idx (CC.addReminder pr)
 
 runMessageWriter :: MonadIO m => (w -> LogLine) -> StateT St (WriterT [w] m) a -> StateT St m a
 runMessageWriter msg prog = do
@@ -293,23 +301,31 @@ drawUI st =
         & (forceAttr ("log" <> "border") hBorder <=>)
 
 drawStatusLine st = withAttr "statusline" $
-    hBox (map drawCalendarName (st^.calendars))
+    hBox (map drawCalendarName $ zip [0..] (st^.calendars))
     <+>
     (padLeft BT.Max $ (str $ range_visible_str))
   where
     range_visible_str =
       let (from,to) = DayGrid.rangeVisible $ (st^.dayGrid)
       in show from ++ " to " ++ show to
-    drawCalendarName (name,cal) =
+    drawCalendarName (idx,(name,cal)) =
+        let
+          attrForSuffix = "calendar" <> attrName (T.unpack name) <> "filled"
+          attrForName =
+            if idx == (st^.calendarFocused)
+            then "calendar" <> attrName (T.unpack name) <> "text" <> "underline"
+            else attrForSuffix
+        in
         (withAttr ("calendar" <> attrName (T.unpack name) <> "separator")
           (str "▏")
           -- (str "▎")
           )
         <+>
-        (withAttr ("calendar" <> attrName (T.unpack name) <> "filled") $
-          txt name
+        (withAttr attrForName $ txt name)
           <+>
-          (str $ if CC.openQueryCount cal > 0 then "+" else " "))
+        (withAttr attrForSuffix
+         $ str
+         $ if CC.openQueryCount cal > 0 then "+" else " ")
 
 getReminders :: Monad m => Day -> ReaderT St m [CB.Incarnation (Int,Ptr)]
 getReminders day =
@@ -368,8 +384,9 @@ mainApp =
                    (setTo $ CalendarConfig.color calcfg) KeepCurrent
             let prefix = attrName "calendar" <> attrName (T.unpack name)
             [ (prefix <> "filled", attr),
-              (prefix <> "text",
-                Attr Default (setTo $ CalendarConfig.colorInv calcfg)
+              (prefix <> "text", attr),
+              (prefix <> "text" <> "underline",
+                Attr (SetTo underline) (setTo $ CalendarConfig.colorInv calcfg)
                      (setTo $ CalendarConfig.color calcfg) KeepCurrent),
               (prefix <> "text" <> "time",
                 Attr (SetTo bold) (setTo $ CalendarConfig.colorInv calcfg)
@@ -548,7 +565,7 @@ testmain = do
   tz <- getCurrentTimeZone
   forkIO $ reportDayChangeThread (writeBChan chan . DayChanged) today
   let initial_state = AppState False day_grid day_range (Just 0) cals_loaded
-                        [] AMNormal emptyReminderEditor chan tz (-20)
+                        0 [] AMNormal emptyReminderEditor chan tz (-20)
                         (Map.union customBinds defaultBinds)
   bootup_state <- flip execStateT initial_state $
     forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)

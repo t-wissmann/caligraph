@@ -49,6 +49,7 @@ data AppState = AppState
     , _dayRange :: (Day,Day)
     , _focusItem :: Maybe Int -- the item focused within a day, Nothing means 'the last'
     , _calendars :: [(Text,Calendar.Calendar)]
+    , _calendarFocused :: Int -- the calendar where new items go to
     , _messages :: [(UTCTime,LogLine)]
     , _mode :: AppMode
     , _newReminderEditor :: Brick.Editor String WidgetName
