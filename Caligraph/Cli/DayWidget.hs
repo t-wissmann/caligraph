@@ -43,7 +43,11 @@ reminder2widget calendarAttr idx r width =
     ( length lines
     , withAttr (attrName "reminderTitle")
       $ vBox
-      $ map (\(d,s) -> (withAttr (calendarAttr <> attrName "text") $ str d) <+> txt s)
+      $ map (\(d,s) ->
+          (if length duration == 0
+          then (\(x,y) -> y <+> x)
+          else (\(x,y) -> x <+> y))
+          (withAttr (calendarAttr <> attrName "text") $ str d, txt s))
       $ zip placeholder lines
     )
   where
@@ -59,17 +63,20 @@ reminder2widget calendarAttr idx r width =
             (T.pack $ CB.title r)
       durationWidth =
         if length duration == 0
-        then 0
+        then 1
         else (+) 1 $ maximum $ map V.safeWcswidth duration
 
       placeholder =
         case duration of
             (beg:end:[]) ->
-                ((beg++" ") : replicate (max 0 $ (length lines) - 2) "  |   ") ++ [end ++ " "]
+                ((beg++" ") : replicate (max 0 $ (length lines) - 2) "  │   ") ++ [end ++ " "]
             (beg:[]) ->
-                ((beg++" ") : replicate (max 0 $ (length lines) - 1) "      ")
+                ((beg++" ") : replicate (max 0 $ (length lines) - 2) "  │   ") ++ ["  └─╼ "]
             _ ->
-                (replicate (length lines) "")
+                -- if length lines == 1 then ["┃"]
+                -- else ("┰" : replicate (max 0 $ (length lines) - 2) "┃") ++ ["┸"]
+                -- (replicate (length lines) "│")
+                (replicate (length lines) "┃")
 
       duration =
         case (CB.time r, CB.duration r) of
@@ -163,7 +170,8 @@ day2widget st width =
         (if Just idx == (focus st)
         then (\(a,b) ->
             ( a
-            , showCursor widgetName (Location (w-1,a-1))
+            , let location = if isTimedReminder inc then (w-1,a-1) else (w-2,a-1) in
+              showCursor widgetName (Location location)
                 $ updateAttrMap
                     (mapAttrNames [ ("selectedReminderTime", "reminderTime")
                                   , ("selectedReminderTitle", "reminderTitle")
@@ -176,6 +184,13 @@ day2widget st width =
         (if width < 20
         then reminder2widgetInline attr idx (fmap snd inc) w
         else reminder2widget attr idx (fmap snd inc) w)
+
+      isTimedReminder :: CB.Incarnation i -> Bool
+      isTimedReminder r =
+        case (CB.time r, CB.duration r) of
+          (Nothing, Nothing) -> False
+          _ -> True
+
       headerAttr
         | (isJust $ focus $ st) && (day st == today st) = "cellHeaderFocusToday"
         | (isJust $ focus $ st)  = "cellHeaderFocus"
