@@ -137,7 +137,7 @@ reminder2widgetInline calendarAttr idx r width =
             [] -> [str ""]
             (hd:tl) ->
                 (:)
-                    ((withAttr "reminderTime" $ str durationString)
+                    ((withAttr (calendarAttr <> attrName "text") $ str durationString)
                      <+>
                    (str "" <+> (str (drop (length durationString) hd))))
                     (map str tl)
