@@ -148,18 +148,29 @@ day2widget :: St -> DayWidget WidgetName
 day2widget st width =
     reminders st
     & zipWith (\i d -> widget i d width) [0..]
-    & intersperse (1, str $ replicate width ' ') -- put empty lines in between
+    & flip alternateLists spacesBetweenWidgets -- put empty lines in between
     & (if (null $ reminders st) then (:) focusIndicator else id)
     & (case (newReminderEditor st) of
         Just e -> (\x-> (1, (Brick.renderEditor (str . head) True e)):(1,str " "):x)
         Nothing -> id)
     & (:) (1, str $ replicate width ' ') -- put an empty line below header
     & (:) headerWidget -- prepend header
-    & flip (++) [(0, fixedfill ' ')] -- we do this to have empty space clickable
+      -- we do the next to have empty space clickable, selecting the last item
+    & flip (++) [(0, clickable (WNDayItem (day st) lastRemIndex) $ fixedfill ' ')]
     & unzip
     & (\(a,b) -> (sum a, clickable widgetName $ vBox b))
     where
+      lastRemIndex = max 0 (length $ reminders st) - 1
+      alternateLists :: [a] -> [a] -> [a]
+      alternateLists [] ys = ys
+      alternateLists (x:xs) ys = (x:alternateLists ys xs)
       widgetName = (WNDay $ day st)
+      spacesBetweenWidgets :: [(Int, Widget WidgetName)]
+      spacesBetweenWidgets =
+        -- we assign the space between items to the previous item, so if one
+        -- clicks on the space between items, the previoius item is selected
+        map (\i -> (1, clickable (WNDayItem (day st) i) $ str $ replicate width ' '))
+            [0..(length (reminders st) - 2)]
       fixedfill :: Char -> Widget n
       fixedfill ch =
           Widget Fixed Fixed $ do
