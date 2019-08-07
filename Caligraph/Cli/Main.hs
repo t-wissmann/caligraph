@@ -366,9 +366,15 @@ mainApp =
             let attr = (CalendarConfig.colorInv calcfg) `on` (CalendarConfig.color calcfg)
             let prefix = attrName "calendar" <> attrName (T.unpack name)
             [ (prefix <> "filled", attr),
-              (prefix <> "text", fg (CalendarConfig.color calcfg)),
+              (prefix <> "text", (CalendarConfig.colorInv calcfg) `on` (CalendarConfig.color calcfg)),
+              (prefix <> "text" <> "time",
+                Attr (SetTo bold) (SetTo $ CalendarConfig.colorInv calcfg)
+                     (SetTo $  CalendarConfig.color calcfg) KeepCurrent),
               (prefix <> "separator", black `on` (CalendarConfig.color calcfg)),
-              (prefix <> "textSelected", (CalendarConfig.color calcfg) `on` black) ]
+              (prefix <> "textSelected", (CalendarConfig.color calcfg) `on` (CalendarConfig.colorInv calcfg)),
+              (prefix <> "textSelected" <> "time",
+                Attr (SetTo bold) (SetTo $  CalendarConfig.color calcfg)
+                     (SetTo $ CalendarConfig.colorInv calcfg) KeepCurrent) ]
         )
       }
 

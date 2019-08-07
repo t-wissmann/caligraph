@@ -47,7 +47,8 @@ reminder2widget calendarAttr idx r width =
           (if length duration == 0
           then (\(x,y) -> y <+> x)
           else (\(x,y) -> x <+> y))
-          (withAttr (calendarAttr <> attrName "text") $ str d, txt s))
+          (withAttr (calendarAttr <> attrName "text" <> attrName "time") $ str d,
+           withAttr (calendarAttr <> attrName "text") $ txt s))
       $ zip placeholder lines
     )
   where
@@ -63,7 +64,7 @@ reminder2widget calendarAttr idx r width =
             (T.pack $ CB.title r)
       durationWidth =
         if length duration == 0
-        then 1
+        then 0
         else (+) 1 $ maximum $ map V.safeWcswidth duration
 
       placeholder =
@@ -78,7 +79,7 @@ reminder2widget calendarAttr idx r width =
                 -- (replicate (length lines) "│")
                 -- (replicate (length lines) "┃")
                 -- (replicate (length lines) "▍")
-                (replicate (length lines) "▐")
+                (replicate (length lines) "")
 
       duration =
         case (CB.time r, CB.duration r) of
@@ -101,7 +102,7 @@ reminder2widget calendarAttr idx r width =
 reminder2widgetInline :: AttrName -> Int -> CB.Incarnation' -> Int -> (Int, Widget n)
 reminder2widgetInline calendarAttr idx r width =
     ( length formatted_lines
-    , withAttr "reminderTitle"
+    , withAttr (calendarAttr <> attrName "text")
       $ vBox formatted_lines
     )
   where
@@ -137,7 +138,7 @@ reminder2widgetInline calendarAttr idx r width =
             [] -> [str ""]
             (hd:tl) ->
                 (:)
-                    ((withAttr (calendarAttr <> attrName "text") $ str durationString)
+                    ((withAttr (calendarAttr <> attrName "text" <> "time") $ str durationString)
                      <+>
                    (str "" <+> (str (drop (length durationString) hd))))
                     (map str tl)
@@ -172,12 +173,12 @@ day2widget st width =
         (if Just idx == (focus st)
         then (\(a,b) ->
             ( a
-            , let location = if isTimedReminder inc then (w-1,a-1) else (w-2,a-1) in
-              showCursor widgetName (Location location)
+            , showCursor widgetName (Location (w-1,a-1))
                 $ updateAttrMap
                     (mapAttrNames [ ("selectedReminderTime", "reminderTime")
                                   , ("selectedReminderTitle", "reminderTitle")
                                   , (attr <> "textSelected", attr <> "text")
+                                  , (attr <> "textSelected" <> "time", attr <> "text" <> "time")
                                   ])
                 $ b
             ))
