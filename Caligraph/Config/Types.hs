@@ -64,7 +64,7 @@ instance Read KeyCombi where
                     (key,_) <- readsPrec 0 keyStr
                     return (fmap (prettyModifier . fst) modsM, prettyKey key)
 
-data PrettyColor = PrettyColor { prettyColor :: Color }
+data PrettyColor = PrettyColor { prettyColor :: Maybe Color }
 
 colornames :: [(Color,String)]
 colornames =
@@ -92,21 +92,23 @@ findlist ((a,b):xs) a' =
   if a == a' then Just b else findlist xs a'
 
 instance Show PrettyColor where
-  show (PrettyColor color) =
+  show (PrettyColor (Just color)) =
     case findlist colornames color of
       Just s -> s
       Nothing -> "UnknownColor"
+  show (PrettyColor (Nothing)) = "default"
 
 instance Read PrettyColor where
   readsPrec _ str = fmap (\c -> (PrettyColor c, "")) $
+    if str == "default" then [Nothing] else
     case findlist (map swap colornames) str of
-      Just color -> return color
+      Just color -> return (Just color)
       Nothing ->
         case str of
         ('#':hexdesc) ->
-          (either (const []) return) $ do
+          (either (const []) return ) $ do
             (r,g,b) <- parseHexBytes hexdesc >>= expectTriple
-            return $ rgbColor r g (b :: Int)
+            return $ Just $ rgbColor r g (b :: Int)
         _ -> []
     where swap (a,b) = (b,a)
 

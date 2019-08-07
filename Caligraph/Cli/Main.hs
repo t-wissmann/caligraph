@@ -363,20 +363,31 @@ mainApp =
           do
             (name,cal) <- _calendars s
             let calcfg = CC.calendarConfig cal
-            let attr = (CalendarConfig.colorInv calcfg) `on` (CalendarConfig.color calcfg)
+            let attr = Attr
+                   Default (setTo $ CalendarConfig.colorInv calcfg)
+                   (setTo $ CalendarConfig.color calcfg) KeepCurrent
             let prefix = attrName "calendar" <> attrName (T.unpack name)
             [ (prefix <> "filled", attr),
-              (prefix <> "text", (CalendarConfig.colorInv calcfg) `on` (CalendarConfig.color calcfg)),
+              (prefix <> "text",
+                Attr Default (setTo $ CalendarConfig.colorInv calcfg)
+                     (setTo $ CalendarConfig.color calcfg) KeepCurrent),
               (prefix <> "text" <> "time",
-                Attr (SetTo bold) (SetTo $ CalendarConfig.colorInv calcfg)
-                     (SetTo $  CalendarConfig.color calcfg) KeepCurrent),
-              (prefix <> "separator", black `on` (CalendarConfig.color calcfg)),
-              (prefix <> "textSelected", (CalendarConfig.color calcfg) `on` (CalendarConfig.colorInv calcfg)),
+                Attr (SetTo bold) (setTo $ CalendarConfig.colorInv calcfg)
+                     (setTo $  CalendarConfig.color calcfg) KeepCurrent),
+              (prefix <> "separator",
+                Attr Default (SetTo black)
+                     (setTo $ CalendarConfig.color calcfg) KeepCurrent),
+              (prefix <> "textSelected",
+                Attr Default (setTo $ CalendarConfig.color calcfg)
+                     (setTo $ CalendarConfig.colorInv calcfg) KeepCurrent),
               (prefix <> "textSelected" <> "time",
-                Attr (SetTo bold) (SetTo $  CalendarConfig.color calcfg)
-                     (SetTo $ CalendarConfig.colorInv calcfg) KeepCurrent) ]
+                Attr (SetTo bold) (setTo $  CalendarConfig.color calcfg)
+                     (setTo $ CalendarConfig.colorInv calcfg) KeepCurrent) ]
         )
       }
+      where
+        setTo Nothing = Default
+        setTo (Just x) = SetTo x
 
 scrollStep = 3
 

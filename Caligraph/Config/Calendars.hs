@@ -15,10 +15,10 @@ import Graphics.Vty.Attributes
 
 data CalendarConfig = CalendarConfig
     { backendType :: String
-    , color :: Color
-    -- ^ the main color of this calendar
-    , colorInv :: Color
-    -- ^ a contrast color
+    , color :: Maybe Color
+    -- ^ the main color of this calendar (Nothing = default)
+    , colorInv :: Maybe Color
+    -- ^ a contrast color (Nothing = default)
     , allSettings :: HashMap Text Text
     }
 
@@ -41,8 +41,8 @@ parseCalendar :: SectionParser CalendarConfig
 parseCalendar section =
     return CalendarConfig
       <*> f "type"
-      <*> withDefault "color" blue prettyColor
-      <*> withDefault "color-inv" black prettyColor
+      <*> withDefault "color" Nothing prettyColor
+      <*> withDefault "color-inv" Nothing prettyColor
       <*> pure section
     where
       f = field section
