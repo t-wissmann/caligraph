@@ -101,7 +101,27 @@ instance Read PrettyColor where
   readsPrec _ str = fmap (\c -> (PrettyColor c, "")) $
     case findlist (map swap colornames) str of
       Just color -> return color
-      Nothing -> []
+      Nothing ->
+        case str of
+        ('#':hexdesc) ->
+          (either (const []) return) $ do
+            (r,g,b) <- parseHexBytes hexdesc >>= expectTriple
+            return $ rgbColor r g (b :: Int)
+        _ -> []
     where swap (a,b) = (b,a)
+
+-- parseHexBytes :: (Read i, Integral i) => String -> Either String [i]
+parseHexBytes :: String -> Either String [Int]
+parseHexBytes str =
+  case str of
+    (x1:x2:xs) -> do
+      pure (:) <*> readEither ['0','x',x1,x2] <*> parseHexBytes xs
+    [] -> Right []
+    (_:[]) -> Left "A hex byte string must be of even length"
+
+expectTriple :: [a] -> Either String (a,a,a)
+expectTriple [a,b,c] = return (a,b,c)
+expectTriple s = Left ("Expected 3 values but got " ++ show (length s))
+
 
 
