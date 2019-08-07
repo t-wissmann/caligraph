@@ -76,7 +76,9 @@ reminder2widget calendarAttr idx r width =
                 -- if length lines == 1 then ["┃"]
                 -- else ("┰" : replicate (max 0 $ (length lines) - 2) "┃") ++ ["┸"]
                 -- (replicate (length lines) "│")
-                (replicate (length lines) "┃")
+                -- (replicate (length lines) "┃")
+                -- (replicate (length lines) "▍")
+                (replicate (length lines) "▐")
 
       duration =
         case (CB.time r, CB.duration r) of
