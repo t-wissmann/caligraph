@@ -6,6 +6,7 @@ import Caligraph.RemindPipe.Types
 import Caligraph.RemindPipe.Parser (parseRemOutput)
 import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
+import qualified Caligraph.Utils as CU
 import Caligraph.Remind.Types (month_names)
 import Caligraph.Utils (expandTilde,editFileExternally)
 
@@ -119,32 +120,7 @@ cachedIncarnations st (from,to) =
 wakeUpLoop :: St -> CB.WakeUpLoop Event
 wakeUpLoop st reportEvent = do
     filepath <- liftIO $ expandTilde (st^.path)
-    FS.withManagerConf conf $ \mgr -> do
-        FS.watchDir
-            mgr
-            (dropFileName filepath)
-            (isAbout filepath)
-            (\event -> do
-                -- after an event occoured, all further events
-                -- within the next debounceTime seconds are ignored.
-                -- thus we need to wait for this time to reconstruct
-                -- the possibly last event within this time period
-                threadDelay (1000 * fromInteger debounceTimeMilliSecs)
-                exists <- doesFileExist (FS.eventPath event)
-                reportEvent $ FileSystem exists (FS.eventPath event))
-        forever $ threadDelay (10 * 1000 * 1000) -- wait for 10 seconds
-    where
-      debounceTimeMilliSecs = 100 -- additional waiting time
-      -- the config collapses all events within 0.1 seconds
-      -- we do this kind of debounce, because programes like vim create three events
-      -- (remove, add, modifiy - in this order)
-      conf = FS.WatchConfig (FS.Debounce $ (fromInteger debounceTimeMilliSecs) / 1000) 1000 False
-      isAbout filepath e = case e of
-        FS.Unknown _ _ _->
-            -- don't react to unknown events (we never ever want to react to read
-            -- events for example...
-            False
-        _ -> takeFileName (FS.eventPath e) == takeFileName filepath
+    CU.watchFile filepath (\exists -> reportEvent $ FileSystem exists filepath)
 
 parseConfig :: (String -> Maybe String) -> Either String (St, CB.WakeUpLoop Event)
 parseConfig cfg =
