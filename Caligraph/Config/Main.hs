@@ -38,9 +38,9 @@ load = do
           <*> parseSection ini "environment" parseEnvironment
 
 parseSection :: Ini -> String -> SectionParser a -> Either String a
-parseSection (Ini ini) sec_name parser =
+parseSection ini sec_name parser =
     mapLeft (\s -> "In section \"" ++ sec_name ++ "\": " ++ s) $
-    case M.lookup (pack sec_name) ini of
+    case M.lookup (pack sec_name) (unIni ini) of
       Just values -> parser values
       Nothing -> parser M.empty
 

@@ -569,7 +569,8 @@ testmain = do
                         (Map.union customBinds defaultBinds)
   bootup_state <- flip execStateT initial_state $
     forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)
-  customMain buildVty (Just chan) mainApp bootup_state
+  vty <- buildVty
+  customMain vty buildVty (Just chan) mainApp bootup_state
   return ()
 
 rightOrDie :: Either String a -> IO a
