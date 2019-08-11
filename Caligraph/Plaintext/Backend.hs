@@ -83,7 +83,27 @@ cachedIncarnations st (from,to) =
 
 handleEvent :: CB.Event Event -> CB.BackendM St Event ()
 handleEvent (CB.SetRangeVisible (from,to)) = return ()
-handleEvent (CB.AddReminder pr) = return ()
+handleEvent (CB.AddReminder pr) = do
+  tildepath <- use path
+  CB.callback ("Adding reminder to " ++ tildepath) $ do
+    fullpath <- CU.expandTilde tildepath
+    let endTime = pure timePlus <*> (CB.prTime pr) <*> (CB.prDuration pr)
+    appendFile fullpath $ concat
+      [ show $ CB.prDay pr
+      , maybe "" ((++) " ") $ fmap showtime (CB.prTime pr)
+      , maybe "" ((++) "-") $ fmap showtime endTime
+      , " "
+      , CB.prTitle pr
+      , "\n"
+      ]
+    return SourceEdited
+    where
+      showtime (h,m) =
+        show h ++ ":"
+        ++ if m < 10 then "0" else "" ++ show m
+      timePlus (fh,fm) (dh,dm) =
+        (fh + dh + ((fm + dm) `div` 60), (fm + dm) `mod` 60)
+
 handleEvent (CB.Response (CalendarLoaded cOrError)) = do
   case cOrError of
     Right c -> do
