@@ -7,6 +7,7 @@ import qualified Caligraph.Utils as CU
 import qualified Caligraph.PointerStore as PS
 
 import Data.Either
+import Data.Maybe
 import Data.Foldable
 
 import Data.Time.Calendar
@@ -119,9 +120,15 @@ handleEvent (CB.Response (FileChanged exists)) = do
       else tell [CB.BALog $ "File " ++ fp ++ " removed"]
 
 calendarParser :: GenParser Char st [CB.Incarnation Int]
-calendarParser = item `endBy` (char '\n')
+calendarParser = fmap catMaybes $
+  (try comment <|> item) `endBy` (many1 $ char '\n')
   where
-    item = do
+    comment = do
+      many (char ' ')
+      char '#'
+      many (noneOf "\n")
+      return Nothing
+    item = fmap Just $ do
       day <- read <$> (many1 $ oneOf "0123456789-")
       char ' '
       l <- fmap sourceLine getPosition
