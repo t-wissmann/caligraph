@@ -75,13 +75,9 @@ wakeUpLoop st reportEvent = do
 
 cachedIncarnations :: St -> (Day,Day) -> CB.Incarnations'
 cachedIncarnations st (from,to) =
-  A.array (from,to) [(d, f d) | d <- [from..to]]
-  where
-    f d =
-      filter (\r -> d == CB.day r)
-      $ maybe [] id
-      $ fmap calReminders
-      $ _calendar st
+  A.accumArray (flip (:)) [] (from,to)
+  $ filter (\ (d,_) -> from <= d && d <= to)
+  $ [ (CB.day r, r) | r <- maybe [] calReminders $ _calendar st ]
 
 handleEvent :: CB.Event Event -> CB.BackendM St Event ()
 handleEvent (CB.SetRangeVisible (from,to)) = return ()
