@@ -28,6 +28,8 @@ library
     Caligraph.Remind.Parser
     Caligraph.Remind.Types
     Caligraph.Remind.Backend
+    Caligraph.CalDav.Backend
+    Caligraph.Plaintext.Backend
     Caligraph.RemindPipe.Parser
     Caligraph.RemindPipe.Types
     Caligraph.RemindPipe.Backend

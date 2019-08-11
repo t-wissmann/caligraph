@@ -90,6 +90,7 @@ data ItemSource event =
       --   that is triggered when the user finished editing
       -- | Source Text (Text -> queryType)
       -- ^ the source is provided, together with an event that updates the item
+      | NoSource
 
 data Event event =
       SetRangeVisible (Day,Day)

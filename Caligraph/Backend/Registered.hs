@@ -5,7 +5,9 @@ module Caligraph.Backend.Registered where
 import Caligraph.Backend.Types (Backend)
 
 import qualified Caligraph.Remind.Backend
+import qualified Caligraph.CalDav.Backend
 import qualified Caligraph.RemindPipe.Backend
+import qualified Caligraph.Plaintext.Backend
 
 import Data.Hashable
 
@@ -16,6 +18,7 @@ backends :: [(String, SomeBackend)]
 backends =
     [ b "remindSimple"  Caligraph.Remind.Backend.backend
     , b "remindPipe"    Caligraph.RemindPipe.Backend.backend
+    , b "plaintext"    Caligraph.Plaintext.Backend.backend
     ]
     where b x y = (x, SomeBackend y)
 

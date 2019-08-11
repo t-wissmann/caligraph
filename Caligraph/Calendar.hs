@@ -152,10 +152,14 @@ receiveWakeUp = doCalendar $ do
 editExternally :: MonadIO io => Ptr -> CalendarT io ()
 editExternally ptr = doCalendar $ do
     be <- use calBackend
-    CB.ExistingFile (path, line) cb <- zoomBackend (\be -> CB.itemSource be ptr)
-    path' <- liftIO $ CU.expandTilde path
-    liftIO $ CU.editFileExternally path' line
-    zoomBackendEvent $ CB.Response cb
+    it_src <- zoomBackend (\be -> CB.itemSource be ptr)
+    case it_src of
+      CB.ExistingFile (path, line) cb -> do
+        path' <- liftIO $ CU.expandTilde path
+        liftIO $ CU.editFileExternally path' line
+        zoomBackendEvent $ CB.Response cb
+      CB.NoSource ->
+        tell ["Source modification not supported"]
 
     ---- st <- get
     ---- be <- return (st^.calBackend)
