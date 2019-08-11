@@ -105,8 +105,8 @@ calendarParser = item `endBy` (char '\n')
       char ' '
       l <- fmap sourceLine getPosition
       reminder_src <- many (noneOf "\n")
-      let desc = reminder_src
-      return $ CB.Incarnation day Nothing Nothing desc l
+      let (from,duration,title) = CB.parseTimeDuration reminder_src
+      return $ CB.Incarnation day from duration title l
 
 reloadFile :: CB.BackendM St Event ()
 reloadFile = do
