@@ -23,6 +23,7 @@ import Lens.Micro.TH
 
 data Calendar i = Calendar
   { calFilePath :: FilePath
+  -- ^ full filepath without tilde
   , calReminders :: [CB.Incarnation i]
   -- ^ we just have single entries
   }
@@ -143,8 +144,11 @@ backend = CB.Backend
   { CB.create = parseConfig
   , CB.cachedIncarnations = cachedIncarnations
   , CB.itemSource = (\ptr -> do
-      return $ CB.NoSource
-      )
+      maybe_path <- use calendar
+      line <- zoom idStore $ PS.resolve ptr
+      return $ case fmap calFilePath maybe_path of
+        Nothing -> CB.NoSource
+        Just p -> CB.ExistingFile (p, line) SourceEdited)
   , CB.handleEvent = (\ev -> do
       handleEvent ev
       inBootup <- use bootup
