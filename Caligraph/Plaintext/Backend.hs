@@ -52,16 +52,24 @@ makeLenses ''St
 data Event =
   CalendarLoaded (Either String (Calendar Int))
   | SourceEdited
+  | FileChanged Bool
+  -- ^ when the file was modified, and whether it still exists
 
 parseConfig :: (String -> Maybe String) -> Either String (St, CB.WakeUpLoop Event)
-parseConfig cfg =
-  pure (,)
-    <*> (pure (\p -> St p PS.empty Nothing True) <*> mandatory "path")
-    <*> pure (\cb -> return ())
+parseConfig cfg = do
+  path <- mandatory "path"
+  let st = St path PS.empty Nothing True
+  return (st, wakeUpLoop st)
   where
     mandatory :: String -> Either String String
     mandatory key =
       maybe (Left $ "Mandatory key " ++ key ++ " missing") Right (cfg key)
+
+wakeUpLoop :: St -> CB.WakeUpLoop Event
+wakeUpLoop st reportEvent = do
+    filepath <- liftIO $ CU.expandTilde (st^.path)
+    CU.watchFile filepath $ \exists ->
+      reportEvent $ FileChanged exists
 
 cachedIncarnations :: St -> (Day,Day) -> CB.Incarnations'
 cachedIncarnations st (from,to) =
@@ -83,6 +91,11 @@ handleEvent (CB.Response (CalendarLoaded cOrError)) = do
       calendar .= Just c'
     Left error -> tell [CB.BAError error]
 handleEvent (CB.Response (SourceEdited)) = return ()
+handleEvent (CB.Response (FileChanged exists)) = do
+      fp <- use path
+      if exists
+      then tell [CB.BALog $ "File " ++ fp ++ " modified"] >> reloadFile
+      else tell [CB.BALog $ "File " ++ fp ++ " removed"]
 
 calendarParser :: GenParser Char st [CB.Incarnation Int]
 calendarParser = item `endBy` (char '\n')

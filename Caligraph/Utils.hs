@@ -5,6 +5,15 @@ import System.FilePath (joinPath)
 
 import System.Environment
 import System.Process
+import qualified System.FSNotify as FS
+-- import System.FilePath
+-- import System.Process
+-- import System.Exit
+import System.Directory (doesFileExist)
+import System.FilePath.Posix
+import Control.Concurrent
+import Control.Monad
+
 import Data.Array as A
 import Data.Maybe
 import Data.Functor.Identity
@@ -81,4 +90,35 @@ forState prog = do
         funzip :: Functor f => f (a,b) -> (f a, f b)
         funzip x = (fmap fst x, fmap snd x)
 
-
+-- | watch the given filepath forever and call the io function
+-- whenever the file changes. The parameter to this callback function
+-- tells whether the file still exists. This function also does a decent amount
+-- of deduplication
+watchFile :: FilePath -> (Bool -> IO ()) -> IO ()
+watchFile filepath callback =
+    FS.withManagerConf conf $ \mgr -> do
+        FS.watchDir
+            mgr
+            (dropFileName filepath)
+            (isAbout filepath)
+            (\event -> do
+                -- after an event occoured, all further events
+                -- within the next debounceTime seconds are ignored.
+                -- thus we need to wait for this time to reconstruct
+                -- the possibly last event within this time period
+                threadDelay (1000 * fromInteger debounceTimeMilliSecs)
+                exists <- doesFileExist (FS.eventPath event)
+                callback exists)
+        forever $ threadDelay (10 * 1000 * 1000) -- wait for 10 seconds
+    where
+      debounceTimeMilliSecs = 100 -- additional waiting time
+      -- the config collapses all events within 0.1 seconds
+      -- we do this kind of debounce, because programes like vim create three events
+      -- (remove, add, modifiy - in this order)
+      conf = FS.WatchConfig (FS.Debounce $ (fromInteger debounceTimeMilliSecs) / 1000) 1000 False
+      isAbout filepath e = case e of
+        FS.Unknown _ _ _->
+            -- don't react to unknown events (we never ever want to react to read
+            -- events for example...
+            False
+        _ -> takeFileName (FS.eventPath e) == takeFileName filepath
