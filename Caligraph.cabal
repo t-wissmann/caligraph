@@ -51,6 +51,8 @@ library
     , parsec
     , brick
     , time
+    , bytestring
+    , data-default
     , fsnotify
     , vty
     , containers
