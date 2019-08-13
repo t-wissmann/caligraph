@@ -90,12 +90,12 @@ doCalendar computation = do
     put (Calendar rc')
     return r
 
-fromConfig :: IO () -> IO () -> Conf.CalendarConfig -> Either String (IO Calendar)
-fromConfig noticeDataReady noticeWakeUp cc = do
+fromConfig :: Conf.CalendarConfig -> Either String (IO () -> IO () -> IO Calendar)
+fromConfig cc = do
     (_,CBR.SomeBackend be) <- maybe (Left $ "No backend named \"" ++ bet ++ "\"") Right $
         find ((==) bet . fst) CBR.backends
     (state,wakeUpLoop) <- CB.create be getOption
-    return $ do
+    return $ \noticeDataReady noticeWakeUp -> do
         args <- newEmptyMVar
         results <- newEmptyMVar
         wakeUpChan <- newChan

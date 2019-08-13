@@ -70,6 +70,7 @@ import Lens.Micro
 import Lens.Micro.Mtl
 
 type St =  Caligraph.Cli.AppState.AppState
+type KeyBindings = (Map.Map ([Modifier],Key) (Cmd St))
 
 data CmdOutput = CmdOutput
     { cmdoutStderr :: [String]
@@ -519,7 +520,7 @@ emptyReminderEditor :: Brick.Editor String WidgetName
 emptyReminderEditor =
     (Brick.editor WNNewReminder (Just 1) "")
 
-loadKeyConfig :: T.Text -> IO (Map.Map ([Modifier],Key) (Cmd St))
+loadKeyConfig :: T.Text -> IO KeyBindings
 loadKeyConfig src = do
   kc <- rightOrDie $ fmap MainConfig.globalKeys $ MainConfig.parseKeyConfig src
   binds <- rightOrDie $ fmap Map.fromList $ forM kc (\(k,v) ->
@@ -559,8 +560,8 @@ testmain = do
   let day_range = DayGrid.rangeVisible day_grid
   cals_loaded <- forM (zip [0..] raw_calendars) (\(i,(t,raw_c)) ->
     do
-    cal <- rightOrDie $ CC.fromConfig (writeBChan chan (CalendarIO i)) (writeBChan chan (CalendarWakeUp i)) raw_c
-    cal' <- cal
+    cal <- rightOrDie $ CC.fromConfig raw_c
+    cal' <- cal (writeBChan chan (CalendarIO i)) (writeBChan chan (CalendarWakeUp i))
     return (t,cal'))
   tz <- getCurrentTimeZone
   forkIO $ reportDayChangeThread (writeBChan chan . DayChanged) today
