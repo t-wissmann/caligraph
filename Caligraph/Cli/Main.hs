@@ -538,13 +538,39 @@ reportDayChangeThread action today = do
     when (today /= today') (action today')
     reportDayChangeThread action today' -- repeat it
 
-testmain :: IO ()
-testmain = do
+mainFromConfig :: KeyBindings -> [(T.Text,IO () -> IO () -> IO CC.Calendar)] -> IO ()
+mainFromConfig keyconfig cals =
   let buildVty = do
         v <- V.mkVty =<< V.standardIOConfig
         V.setMode (V.outputIface v) V.Mouse True
         return v
+  in do
+  -- main channel
+  chan <- newBChan (10 + 2 * length cals)
+  -- subscribe to day changes
   today <- DayGrid.getToday
+  tz <- getCurrentTimeZone
+  forkIO $ reportDayChangeThread (writeBChan chan . DayChanged) today
+  -- initialize calendars
+  cals_loaded <- forM (zip [0..] cals) (\(i,(t,raw_c)) -> do
+    cal' <- raw_c (writeBChan chan (CalendarIO i)) (writeBChan chan (CalendarWakeUp i))
+    return (t,cal'))
+  -- init widgets
+  let day_grid = (DayGrid.init WNDayGrid today)
+  let day_range = DayGrid.rangeVisible day_grid
+  -- init main state
+  let initial_state = AppState False day_grid day_range (Just 0) cals_loaded
+                        0 [] AMNormal emptyReminderEditor chan tz (-20)
+                        keyconfig
+
+  bootup_state <- flip execStateT initial_state $
+    forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)
+  vty <- buildVty
+  customMain vty buildVty (Just chan) mainApp bootup_state
+  return ()
+
+testmain :: IO ()
+testmain = do
   args <- getArgs
   -- load main config
   config <- MainConfig.load >>= rightOrDie
@@ -555,24 +581,10 @@ testmain = do
   defaultBinds <- loadKeyConfig ConfigDefaults.defaultKeys
   -- load calendar config
   raw_calendars <- CalendarConfig.load >>= rightOrDie
-  chan <- newBChan (10 + 2 * length raw_calendars)
-  let day_grid = (DayGrid.init WNDayGrid today)
-  let day_range = DayGrid.rangeVisible day_grid
-  cals_loaded <- forM (zip [0..] raw_calendars) (\(i,(t,raw_c)) ->
-    do
-    cal <- rightOrDie $ CC.fromConfig raw_c
-    cal' <- cal (writeBChan chan (CalendarIO i)) (writeBChan chan (CalendarWakeUp i))
-    return (t,cal'))
-  tz <- getCurrentTimeZone
-  forkIO $ reportDayChangeThread (writeBChan chan . DayChanged) today
-  let initial_state = AppState False day_grid day_range (Just 0) cals_loaded
-                        0 [] AMNormal emptyReminderEditor chan tz (-20)
-                        (Map.union customBinds defaultBinds)
-  bootup_state <- flip execStateT initial_state $
-    forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)
-  vty <- buildVty
-  customMain vty buildVty (Just chan) mainApp bootup_state
-  return ()
+  inited_calendars <- forM raw_calendars (\(t,c) -> do
+    c' <- rightOrDie (CC.fromConfig c)
+    return (t,c'))
+  mainFromConfig (Map.union customBinds defaultBinds) inited_calendars
 
 rightOrDie :: Either String a -> IO a
 rightOrDie = either die return
