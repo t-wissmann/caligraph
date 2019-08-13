@@ -28,7 +28,7 @@ library
     Caligraph.Remind.Parser
     Caligraph.Remind.Types
     Caligraph.Remind.Backend
-    Caligraph.CalDav.Backend
+    Caligraph.IcsFile.Backend
     Caligraph.Plaintext.Backend
     Caligraph.RemindPipe.Parser
     Caligraph.RemindPipe.Types
@@ -75,6 +75,7 @@ library
     , unordered-containers
     , hashable
     , MissingH
+    , iCalendar
   default-language:    Haskell2010
 
 executable caligraph

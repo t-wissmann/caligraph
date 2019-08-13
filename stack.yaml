@@ -38,7 +38,15 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
-# extra-deps: []
+extra-deps:
+- iCalendar-0.4.0.5@sha256:2a3dca74955de4d3548e4592201093b59328ca153ad207bad189e73cc04f4be0,1962
+- containers-0.5.11.0@sha256:28ad7337057442f75bc689315ab4ec7bdf5e6b2c39668f306672cecd82c02798,16685
+- mime-0.4.0.2@sha256:208947d9d1a19d08850be67ecb28c6e776db697f3bba05bd9d682e51a59f241f,983
+- network-2.6.3.6@sha256:1ca79d81af02d7acd6032d5e6c9bde4618a8fdcfbe19bd42b49d420183975df0,2666
+- binary-0.8.7.0@sha256:ae3e6cca723ac55c54bbb3fa771bcf18142bc727afd57818e66d6ee6c8044f12,7705
+- text-1.2.4.0@sha256:8c24450feb8e3bbb7ea3e17af24ef57e85db077c4bf53e5bcc345b283d1b1d5b,10081
+
+
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
