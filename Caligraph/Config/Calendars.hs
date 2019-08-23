@@ -8,8 +8,11 @@ import Caligraph.Utils (mapLeft)
 import Data.Text
 import Data.Text.IO as T
 import Data.Ini
+import Control.Monad.IO.Class (liftIO)
 import System.Environment.XDG.BaseDir
 import Text.Read (readEither)
+import Control.Monad.Trans.Except
+import Control.Monad
 
 import Graphics.Vty.Attributes
 
@@ -24,18 +27,23 @@ data CalendarConfig = CalendarConfig
 
 type RawCalList = [(Text, CalendarConfig)]
 
-load :: IO (Either String RawCalList)
-load = do
-    path <- getUserConfigFile "caligraph" "calendars.ini"
-    src <- T.readFile path
-    return $ do
-        ini <- parseIni src
-        mapM parseSection $ M.toList $ unIni ini
+loadConfig :: ExceptT String IO RawCalList
+loadConfig = do
+    path <- liftIO $ getUserConfigFile "caligraph" "calendars.ini"
+    src <- liftIO $ T.readFile path
+    ini <- except $ parseIni src
+    mapM parseSection $ M.toList $ unIni ini
     where
     parseSection (a,b) =
-        mapLeft (\s -> "In section \"" ++ unpack a ++ "\": " ++ s) $
-        return ((,) a) <*> parseCalendar b
+        withExceptT (\s -> "In section \"" ++ unpack a ++ "\": " ++ s) $
+        return ((,) a) <*> except (parseCalendar b)
 
+loadCalendars :: (CalendarConfig -> Either String a) -> ExceptT String IO [(Text, a)]
+loadCalendars fromConfig = do
+  raw_calendars <- loadConfig
+  forM raw_calendars (\(t,c) -> do
+    c' <- except $ fromConfig c
+    return (t,c'))
 
 parseCalendar :: SectionParser CalendarConfig
 parseCalendar section =

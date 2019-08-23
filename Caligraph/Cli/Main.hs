@@ -36,6 +36,7 @@ import Control.Monad.State
 import Control.Monad.Writer.Lazy
 import Control.Monad.Reader
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Except
 import Data.Array
 import Data.Maybe
 import Data.Fixed (Fixed(MkFixed),resolution)
@@ -578,11 +579,8 @@ testmain = do
   customBinds <- MainConfig.keyConfigUserPath >>= MainConfig.getSource >>= loadKeyConfig
   defaultBinds <- loadKeyConfig ConfigDefaults.defaultKeys
   -- load calendar config
-  raw_calendars <- CalendarConfig.load >>= rightOrDie
-  inited_calendars <- forM raw_calendars (\(t,c) -> do
-    c' <- rightOrDie (CC.fromConfig c)
-    return (t,c'))
-  mainFromConfig (Map.union customBinds defaultBinds) inited_calendars
+  cals <- runExceptT (CalendarConfig.loadCalendars CC.fromConfig) >>= rightOrDie
+  mainFromConfig (Map.union customBinds defaultBinds) cals
 
 rightOrDie :: Either String a -> IO a
 rightOrDie = either die return
