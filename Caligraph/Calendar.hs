@@ -48,6 +48,16 @@ makeLenses ''RawCalendar
 data Calendar = forall stateType eventType.
         Calendar (RawCalendar stateType eventType)
 
+type ConfiguredCalendar
+  = IO ()
+  -- ^ IO action that the calendar has to
+  --   perform when requested data is ready
+  -> IO ()
+  -- ^ IO action that the calendar can perform when
+  --   unrequested data is ready (e.g. some file changed)
+  -> IO Calendar
+  -- ^ the calendar
+
 type CalendarT m a = StateT Calendar (WriterT [LogLine] m) a
 type CalendarM a = CalendarT Identity a
 
@@ -90,7 +100,7 @@ doCalendar computation = do
     put (Calendar rc')
     return r
 
-fromConfig :: Conf.CalendarConfig -> Either String (IO () -> IO () -> IO Calendar)
+fromConfig :: Conf.CalendarConfig -> Either String ConfiguredCalendar
 fromConfig cc = do
     (_,CBR.SomeBackend be) <- maybe (Left $ "No backend named \"" ++ bet ++ "\"") Right $
         find ((==) bet . fst) CBR.backends

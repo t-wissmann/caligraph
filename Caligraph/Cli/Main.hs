@@ -538,7 +538,8 @@ reportDayChangeThread action today = do
     when (today /= today') (action today')
     reportDayChangeThread action today' -- repeat it
 
-mainFromConfig :: KeyBindings -> [(T.Text,IO () -> IO () -> IO CC.Calendar)] -> IO ()
+
+mainFromConfig :: KeyBindings -> [(T.Text,CC.ConfiguredCalendar)] -> IO ()
 mainFromConfig keyconfig cals =
   let buildVty = do
         v <- V.mkVty =<< V.standardIOConfig
