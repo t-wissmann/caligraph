@@ -58,7 +58,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.HashMap.Strict as HashMap
 import System.Exit
 import System.IO
-import System.Environment (getArgs,setEnv)
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MVar
 
@@ -572,11 +571,9 @@ mainFromConfig keyconfig cals =
 
 testmain :: IO ()
 testmain = do
-  args <- getArgs
   -- load main config
   config <- MainConfig.load >>= rightOrDie
-  forM_ (HashMap.toList $ MainConfig.environment config) (\(k,v) ->
-    setEnv (T.unpack k) (T.unpack v))
+  MainConfig.evaluateEnvironmentConfig (MainConfig.environment config)
   -- load key config
   customBinds <- MainConfig.keyConfigUserPath >>= MainConfig.getSource >>= loadKeyConfig
   defaultBinds <- loadKeyConfig ConfigDefaults.defaultKeys

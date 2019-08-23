@@ -13,12 +13,19 @@ import Control.Monad
 import Text.Read
 import qualified Data.List.Split as Split
 import System.IO.Error
+import System.Environment (getArgs,setEnv)
 
 data Config = Config {
   environment :: M.HashMap Text Text
   }
 
 type SectionParser a = M.HashMap Text Text -> Either String a
+
+
+evaluateEnvironmentConfig :: M.HashMap Text Text -> IO ()
+evaluateEnvironmentConfig envCfg =
+  forM_ (M.toList envCfg) (\(k,v) ->
+    setEnv (unpack k) (unpack v))
 
 getSource :: String -> IO Text
 getSource path = handle readHandler $ T.readFile path
