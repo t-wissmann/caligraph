@@ -87,6 +87,8 @@ executable caligraph
   build-depends:       base
                      , Caligraph
                      , optparse-applicative
+                     , transformers
+                     , containers
   default-language:    Haskell2010
 
 test-suite Caligraph-test
