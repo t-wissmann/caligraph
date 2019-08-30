@@ -23,3 +23,10 @@ backends =
     ]
     where b x y = (x, SomeBackend y)
 
+fileExtension2backend :: [(String,String)]
+fileExtension2backend =
+  [ (,) ".rem" "remindPipe"
+  , (,) ".txt" "plaintext"
+  , (,) ".ics" "icsfile"
+  ]
+
