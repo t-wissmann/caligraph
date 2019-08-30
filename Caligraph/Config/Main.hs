@@ -54,7 +54,8 @@ parseSection ini sec_name parser =
 parseEnvironment :: SectionParser (M.HashMap Text Text)
 parseEnvironment = Right
 
-data KeyConfig = KeyConfig { globalKeys :: [(KeyCombi, [String])] } -- | a mapping of strings to commands
+-- | a mapping of strings to commands
+data KeyConfig = KeyConfig { globalKeys :: [(KeyCombi, [String])] }
 
 -- | filepath to user's key config
 keyConfigUserPath :: IO FilePath

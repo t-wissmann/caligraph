@@ -10,10 +10,10 @@ import Control.Monad (ap)
 import Text.Read (readEither)
 import Text.Printf (printf)
 
+-- | OptionalArgument (Maybe String -> Either String (CommandArgParser target))
 data CommandArgParser target
     = NoMoreArguments target
     | MandatoryArgument (String -> Either String (CommandArgParser target))
-    -- | OptionalArgument (Maybe String -> Either String (CommandArgParser target))
 
 instance Functor CommandArgParser where
     fmap f (NoMoreArguments p) = NoMoreArguments $ f p

@@ -169,10 +169,10 @@ getToday = do
   tz <- getCurrentTimeZone
   return $ localDay
          $ utcToLocalTime tz
-         -- $ addUTCTime (9 * 60 * 60 + 30 * 60) -- for debugging only
+         -- addUTCTime (9 * 60 * 60 + 30 * 60) -- for debugging only
          $ g
 
--- | reander the header rows
+-- | render the header rows
 renderHeaderRows
   :: (RowController
   -- ^ the row controller
