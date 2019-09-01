@@ -23,10 +23,13 @@ backends =
     ]
     where b x y = (x, SomeBackend y)
 
-fileExtension2backend :: [(String,String)]
-fileExtension2backend =
-  [ (,) ".rem" "remindPipe"
-  , (,) ".txt" "plaintext"
-  , (,) ".ics" "icsfile"
+-- | pairs of regexes for the 'path' setting toegher with the name of a backend
+-- that can handle this kind of 'path'. The regexes should be applied case
+-- insensitive.
+pathRegex2backend :: [(String,String)]
+pathRegex2backend =
+  [ (,) ".*\\.rem$" "remindPipe"
+  , (,) ".*\\.txt$" "plaintext"
+  , (,) ".*\\.ics$" "icsfile"
   ]
 

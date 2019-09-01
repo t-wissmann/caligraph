@@ -22,6 +22,8 @@ import qualified Data.HashMap.Strict as HMap
 import qualified Data.Text as T
 import Options.Applicative
 import Data.Semigroup ((<>))
+import Text.Regex
+import Data.Maybe (isJust)
 
 data CliOpts = CliOpts
   { calendarfFile :: FilePath
@@ -74,7 +76,10 @@ mainConfigurable params = do
 
 filepath2calendar :: FilePath -> Either String (T.Text,CC.ConfiguredCalendar)
 filepath2calendar filepath = do
-  backName <- lookup (takeExtension filepath) CB.fileExtension2backend "file extension"
+  let possibleBackends = filter (\(r,_) -> r `matches` filepath) CB.pathRegex2backend
+  backName <- case possibleBackends of
+              [] -> Left $ "Can not detect file type of " ++ filepath
+              ((_,back):_) -> Right back
   calCfg <- Cfg.parseCalendar $ HMap.fromList $ toText
             [ ("type", backName)
             , ("path", filepath)
@@ -83,8 +88,5 @@ filepath2calendar filepath = do
             ]
   (,) (T.pack $ takeBaseName filepath) <$> CC.fromConfig calCfg
   where
-    lookup k tuplelist desc =
-      case Map.lookup k (Map.fromList tuplelist) of
-      Nothing -> Left $ "Unknown " ++ desc ++ ": " ++ k
-      Just x -> Right x
+    matches reg str = isJust $ matchRegex (mkRegexWithOpts reg False False) str
     toText = map (\(a,b) -> (T.pack a, T.pack b))
