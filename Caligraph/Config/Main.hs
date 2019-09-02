@@ -19,8 +19,6 @@ data Config = Config {
   environment :: M.HashMap Text Text
   }
 
-type SectionParser a = M.HashMap Text Text -> Either String a
-
 
 evaluateEnvironmentConfig :: M.HashMap Text Text -> IO ()
 evaluateEnvironmentConfig envCfg =

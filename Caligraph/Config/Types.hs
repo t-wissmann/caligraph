@@ -6,8 +6,12 @@ import Data.Char
 import Text.Read
 import qualified Data.List.Split as Split
 
+import qualified Data.HashMap.Strict as M
+
 import Graphics.Vty.Input.Events (Modifier, Key(KChar,KFun))
 import Graphics.Vty.Attributes
+
+type SectionParser a = M.HashMap Text Text -> Either String a
 
 data PrettyKey = PrettyKey { prettyKey :: Key } deriving (Eq,Ord)
 
