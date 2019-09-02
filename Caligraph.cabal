@@ -46,6 +46,7 @@ library
     Caligraph.Config.Calendars
     Caligraph.Config.Command
     Caligraph.Config.Defaults
+    Caligraph.Rules
   build-depends:
       base
     , parsec
