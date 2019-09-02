@@ -77,7 +77,7 @@ handleEvent (CB.AddReminder pr) = do
 handleEvent (CB.Response (CalendarLoaded cOrError)) = do
   case cOrError of
     Right ([],warnings) -> do
-      tell [CB.BAError $ "File as no calendars."]
+      tell [CB.BAError $ "File has no calendars."]
     Right ((c:_),warnings) -> do
       -- c' <- zoom idStore $ mapM PS.lookupOrInsert c
       -- calendar .= Just c'
