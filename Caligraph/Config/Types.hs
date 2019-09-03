@@ -8,12 +8,58 @@ import qualified Data.List.Split as Split
 
 import qualified Data.HashMap.Strict as M
 
+import Text.ParserCombinators.Parsec
+import Control.Arrow (left)
+
 import Graphics.Vty.Input.Events (Modifier, Key(KChar,KFun))
 import Graphics.Vty.Attributes
 
 type SectionParser a = M.HashMap Text Text -> Either String a
 
 data PrettyKey = PrettyKey { prettyKey :: Key } deriving (Eq,Ord)
+
+class UserReadShow a where
+  userShow :: a -> String
+  userParser :: GenParser Char () a
+
+userRead :: UserReadShow a => String -> Either String a
+userRead str =
+  left show $ parse userParser "" str
+
+-- userReadAuto :: Read a => String -> String -> Either String a
+-- userReadAuto typeName str =
+--   case (readEither str) of
+--     Left _ -> Left ("not a valid " ++ typeName)
+--     Right x -> Right x
+-- 
+instance UserReadShow Int where
+  userShow = show
+  userParser = read <$> many1 digit
+
+-- instance UserReadShow Double where
+--   userShow = show
+--   userRead = userReadAuto "floating point number"
+
+instance UserReadShow Key where
+  userShow k = case k of
+        KChar '-' -> "minus"
+        KChar ch -> [ch]
+        KFun int -> ('F' : show int)
+        _ -> drop 1 (show k) -- drop the 'K'
+  userParser =
+        (string "minus" >> return (KChar '-'))
+        <|> (char '@' >> ((KChar . chr) <$> userParser))
+        <|> (char 'F' >> (KFun <$> userParser))
+        <|> try (do
+          c <- anyToken
+          eof
+          return $ KChar c)
+        <|> try (do
+          str <- many1 alphaNum
+          case readEither ('K':str) of
+            Right x -> return (x :: Key)
+            Left _ -> fail ("Unknown key name " ++ str)
+          )
 
 instance Show PrettyKey where
     show (PrettyKey k) = case k of
