@@ -3,7 +3,8 @@ module Caligraph.Config.Types where
 
 import Data.Text (Text, pack, unpack)
 import Data.Char
-import Text.Read
+import Data.List
+import Text.Read (readEither)
 import qualified Data.List.Split as Split
 
 import qualified Data.HashMap.Strict as M
@@ -12,6 +13,7 @@ import Text.ParserCombinators.Parsec
 import Control.Arrow (left)
 
 import Graphics.Vty.Input.Events (Modifier, Key(KChar,KFun))
+import qualified Graphics.Vty.Input.Events  as Event
 import Graphics.Vty.Attributes
 
 type SectionParser a = M.HashMap Text Text -> Either String a
@@ -20,11 +22,12 @@ data PrettyKey = PrettyKey { prettyKey :: Key } deriving (Eq,Ord)
 
 class UserReadShow a where
   userShow :: a -> String
+  -- | parse to the given type, possibly not consuming all tokens
   userParser :: GenParser Char () a
 
 userRead :: UserReadShow a => String -> Either String a
 userRead str =
-  left show $ parse userParser "" str
+  left show $ parse (do x <- userParser; eof; return x) "" str
 
 -- userReadAuto :: Read a => String -> String -> Either String a
 -- userReadAuto typeName str =
@@ -40,6 +43,20 @@ instance UserReadShow Int where
 --   userShow = show
 --   userRead = userReadAuto "floating point number"
 
+class FinitelyManyNames a where
+  -- | list of names. Elements of a are allowed to occur multiple times
+  -- but for showing, only the first entry is used
+  finitelyManyNames :: [(String, a)]
+
+showName :: (Eq a, FinitelyManyNames a) => a -> String
+showName x = case find (\(_,v) -> v == x) finitelyManyNames of
+  Just (name,_) -> name
+  Nothing -> error "Value does not appear in finitelyManyNames"
+
+parseName :: FinitelyManyNames a => GenParser Char () a
+parseName =
+  choice $ map (\(n,v) -> string n >> return v) finitelyManyNames
+
 instance UserReadShow Key where
   userShow k = case k of
         KChar '-' -> "minus"
@@ -52,7 +69,6 @@ instance UserReadShow Key where
         <|> (char 'F' >> (KFun <$> userParser))
         <|> try (do
           c <- anyToken
-          eof
           return $ KChar c)
         <|> try (do
           str <- many1 alphaNum
@@ -96,6 +112,19 @@ instance Read PrettyModifier where
     readsPrec k str = do
         (m,r) <- readsPrec k ('M':str)
         return (PrettyModifier m, r)
+
+instance FinitelyManyNames Modifier where
+  finitelyManyNames =
+    [ (,) "Shift"   Event.MShift
+    , (,) "Ctrl"    Event.MCtrl
+    , (,) "Meta"    Event.MMeta
+    , (,) "Control" Event.MCtrl
+    , (,) "Alt"     Event.MMeta
+    ]
+
+instance UserReadShow Modifier where
+  userShow = showName
+  userParser = parseName
 
 data KeyCombi = KeyCombi {keyCombi :: ([Modifier], Key)} deriving (Eq,Ord) -- a list of modifiers and a key
 
