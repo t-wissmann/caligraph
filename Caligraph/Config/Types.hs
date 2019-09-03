@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 -- | a collection of parsers for types used in the config
 module Caligraph.Config.Types where
 
@@ -56,6 +58,21 @@ showName x = case find (\(_,v) -> v == x) finitelyManyNames of
 parseName :: FinitelyManyNames a => GenParser Char () a
 parseName =
   choice $ map (\(n,v) -> string n >> return v) finitelyManyNames
+
+instance FinitelyManyNames Bool where
+  finitelyManyNames =
+    [ (,) "true" True
+    , (,) "false" False
+    , (,) "on" True
+    , (,) "off" False
+    ]
+instance UserReadShow Bool where
+  userShow = showName
+  userParser = parseName
+
+instance UserReadShow String where
+  userShow = id
+  userParser = many anyToken
 
 instance UserReadShow Key where
   userShow k = case k of
