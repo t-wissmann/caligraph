@@ -5,7 +5,8 @@
 
 module Caligraph.Config.Command where
 
-import Caligraph.Utils (mapLeft)
+import Caligraph.Config.Types (userRead, UserReadShow)
+
 import Control.Monad (ap)
 import Text.Read (readEither)
 import Text.Printf (printf)
@@ -35,15 +36,9 @@ instance Monad CommandArgParser where
     --         l <- (f s)
     --         return (l >>= a_to_mb))
 
-readArg :: Read a => CommandArgParser a
-readArg = MandatoryArgument
-    (\s -> fmap return $
-           mapLeft (\_ -> "Invalid Token \"" ++ s ++ "\"") $
-           readEither s)
-
-readPlainString :: CommandArgParser String
-readPlainString = MandatoryArgument
-    (\s -> return $ return s)
+arg :: UserReadShow a => CommandArgParser a
+arg = MandatoryArgument
+    (\s -> fmap return $ userRead s)
 
 -- readStringTokens :: CommandArgParser [String]
 -- readStringTokens = OptionalArgument
@@ -100,6 +95,6 @@ twoArgs x y = return ()
 functions :: [CommandArgParser (IO ())]
 functions =
     [ return noArgs
-    , return oneArg <*> readArg
-    , return twoArgs <*> readArg <*> readArg
+    , return oneArg <*> arg
+    , return twoArgs <*> arg <*> arg
     ]

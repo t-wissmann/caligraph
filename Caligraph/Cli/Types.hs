@@ -1,9 +1,23 @@
 module Caligraph.Cli.Types where
 
+import Caligraph.Config.Types
+
 import Brick
 import Data.Time.Calendar
 
 data Dir = DirUp | DirDown | DirLeft  | DirRight deriving (Eq,Show)
+
+instance FinitelyManyNames Dir where
+  finitelyManyNames =
+    [ (,) "up" DirUp
+    , (,) "down" DirDown
+    , (,) "left" DirLeft
+    , (,) "right" DirRight
+    ]
+
+instance UserReadShow Dir where
+  userShow = showName
+  userParser = parseName
 
 instance Read Dir where
     readsPrec _ str = (\x -> [(x,"")]) $

@@ -128,14 +128,14 @@ commands = Map.fromList
     return (\d -> dayGrid %= DayGrid.scrollPage d) <*> a
   , (,) "focus-month" $
     return focus_month_relative_cmd <*> a
-  , (,) "shell" $ return shell_cmd <*> CCommand.readPlainString
+  , (,) "shell" $ return shell_cmd <*> a
   , (,) "toggle-log" $ return toggle_log_cmd
   , (,) "focus" $ return focus_cmd <*> a
   , (,) "cycle-calendar" $ return cycle_calendar_focus_cmd
   ]
   where
-    a :: Read x => CCommand.CommandArgParser x
-    a = CCommand.readArg
+    a :: CfgTypes.UserReadShow x => CCommand.CommandArgParser x
+    a = CCommand.arg
 
 quit_cmd :: Cmd St
 quit_cmd =

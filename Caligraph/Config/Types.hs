@@ -39,7 +39,15 @@ userRead str =
 -- 
 instance UserReadShow Int where
   userShow = show
-  userParser = read <$> many1 digit
+  userParser = read <$> many1 (oneOf "-0123456789")
+
+instance UserReadShow Integer where
+  userShow = show
+  userParser = read <$> many1 (oneOf "-0123456789")
+
+instance UserReadShow Double where
+  userShow = show
+  userParser = read <$> many1 (oneOf "-0123456789.")
 
 -- instance UserReadShow Double where
 --   userShow = show
@@ -145,10 +153,18 @@ instance UserReadShow Modifier where
 
 data KeyCombi = KeyCombi {keyCombi :: ([Modifier], Key)} deriving (Eq,Ord) -- a list of modifiers and a key
 
-instance Show KeyCombi where
-    show (KeyCombi (mods, key)) =
+instance UserReadShow KeyCombi where
+  userShow (KeyCombi (mods, key)) =
         foldl1 (\x y -> x ++ ['-'] ++ y) $
-        map (show . PrettyModifier) mods ++ [show $ PrettyKey key]
+        map userShow mods ++ [userShow key]
+
+  userParser = do
+    mods <- userParser `endBy` char '-'
+    key <- userParser
+    return $ KeyCombi (mods,key)
+
+instance Show KeyCombi where
+  show = userShow
 
 instance Read KeyCombi where
     readsPrec _ str =
@@ -181,6 +197,23 @@ colornames =
   , (,) brightCyan "brightcyan"
   , (,) brightWhite "brightwhite"
   ]
+
+instance FinitelyManyNames Color where
+  finitelyManyNames = map (\(a,b) -> (b,a)) colornames
+
+instance UserReadShow Color where
+  userShow = showName
+  userParser =
+    (do
+      char '#'
+      [r,g,b] <- count 3 byte
+      return $ rgbColor r g b
+    )
+    <|> parseName
+    where byte = do
+            a <- oneOf "0123456789abcdefABCDEF"
+            b <- oneOf "0123456789abcdefABCDEF"
+            return (read ['0','x',a,b] :: Int)
 
 findlist :: Eq a => [(a,b)] -> a -> Maybe b
 findlist [] _ = Nothing
