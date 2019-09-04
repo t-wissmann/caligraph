@@ -9,6 +9,10 @@ infixr 5 =!=
   then return ()
   else Left $ "Failed assertion " ++ show x ++ " =!= " ++ show y
 
+isLeft :: (Show b) => Either a b -> TestM ()
+isLeft (Left _) = return ()
+isLeft (Right x) = Left "fail" -- Right (show x) =!= Left "any error message"
+
 runTester :: TestM () -> IO Bool
 runTester t =
   case t of

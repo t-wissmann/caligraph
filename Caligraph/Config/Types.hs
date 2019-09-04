@@ -85,22 +85,24 @@ instance UserReadShow String where
 instance UserReadShow Key where
   userShow k = case k of
         KChar '-' -> "minus"
+        KChar ' ' -> "space"
         KChar ch -> [ch]
         KFun int -> ('F' : show int)
         _ -> drop 1 (show k) -- drop the 'K'
   userParser =
-        (string "minus" >> return (KChar '-'))
-        <|> (char '@' >> ((KChar . chr) <$> userParser))
-        <|> (char 'F' >> (KFun <$> userParser))
-        <|> try (do
-          c <- anyToken
-          return $ KChar c)
+        try (string "minus" >> return (KChar '-'))
+        <|> try (string "space" >> return (KChar ' '))
+        <|> try (char '@' >> ((KChar . chr) <$> userParser))
+        <|> try (char 'F' >> (KFun <$> userParser))
         <|> try (do
           str <- many1 alphaNum
           case readEither ('K':str) of
             Right x -> return (x :: Key)
             Left _ -> fail ("Unknown key name " ++ str)
           )
+        <|> try (do
+          c <- anyToken
+          return $ KChar c)
 
 instance Show PrettyKey where
     show (PrettyKey k) = case k of

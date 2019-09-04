@@ -2,6 +2,7 @@
 module Config where
 
 import Caligraph.Config.Main
+import Caligraph.Config.Types
 import Tester
 import Text.Read
 import Control.Monad
@@ -11,6 +12,7 @@ exampleKeyCombis =
   , "Ctrl-Up"
   , "Meta-minus"
   , "minus"
+  , "Home"
   , "d"
   , "+"
   , "Ctrl-Shift->"
@@ -19,7 +21,9 @@ exampleKeyCombis =
 
 testConfig :: TestM ()
 testConfig = do
-  forM_ exampleKeyCombis (\kombi ->
-    kombi =!= show ((read kombi) :: KeyCombi))
-  forM_ ["ome", "Shif-x", "Ctrl-esc", "Ctrl+c"] (\wrongCombi ->
-    Nothing =!= (readMaybe wrongCombi :: Maybe KeyCombi))
+  forM_ exampleKeyCombis (\kombi -> do
+    k <- userRead kombi
+    kombi =!= userShow (k :: KeyCombi))
+  forM_ ["ome", "Shif-x", "Ctrl-esc", "Ctrl+c"] (\wrongCombi -> do
+    isLeft (userRead wrongCombi :: Either String KeyCombi)
+    )
