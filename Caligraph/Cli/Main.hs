@@ -23,6 +23,7 @@ import Caligraph.Possibly
 import Caligraph.PointerStore (Ptr)
 import qualified Caligraph.Config.Main as MainConfig
 import qualified Caligraph.Config.Types as CfgTypes
+import Caligraph.Config.Types (userShow)
 import qualified Caligraph.Config.Defaults as ConfigDefaults
 import qualified Caligraph.Config.Command as CCommand
 import qualified Caligraph.Config.Calendars as CalendarConfig
@@ -524,7 +525,7 @@ loadKeyConfig :: T.Text -> IO KeyBindings
 loadKeyConfig src = do
   kc <- rightOrDie $ fmap MainConfig.globalKeys $ MainConfig.parseKeyConfig src
   binds <- rightOrDie $ fmap Map.fromList $ forM kc (\(k,v) ->
-    mapLeft (\s -> "In binding of \"" ++ show k ++ "\" to \"" ++ show v ++ ": " ++ s) $
+    mapLeft (\s -> "In binding of \"" ++ userShow k ++ "\" to \"" ++ show v ++ ": " ++ s) $
     do
         cmd <- CCommand.bindFromMap (flip Map.lookup commands) v
         return (CfgTypes.keyCombi k,cmd))

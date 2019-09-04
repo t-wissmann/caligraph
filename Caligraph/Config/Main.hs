@@ -65,6 +65,6 @@ parseKeyConfig src = fmap KeyConfig $ do
   let sec = maybe [] id $ fmap M.toList $ M.lookup (pack "") (unIni ini)
   forM sec (\(key,value) -> do
       keyParsed <- mapLeft (\_ -> "Invalid key combi " ++ unpack key)
-                   (readEither $ unpack key)
+                   (userRead $ unpack key)
       let command = Split.splitOn " " (unpack value)
       return (keyParsed :: KeyCombi, command :: [String]))
