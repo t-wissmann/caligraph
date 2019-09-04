@@ -29,7 +29,9 @@ class UserReadShow a where
 
 userRead :: UserReadShow a => String -> Either String a
 userRead str =
-  left show $ parse (do x <- userParser; eof; return x) "" str
+  left show
+    $ parse (do x <- userParser; eof; return x)
+            ("token \"" ++ str ++ "\"") str
 
 -- userReadAuto :: Read a => String -> String -> Either String a
 -- userReadAuto typeName str =
@@ -216,6 +218,17 @@ instance UserReadShow Color where
             a <- oneOf "0123456789abcdefABCDEF"
             b <- oneOf "0123456789abcdefABCDEF"
             return (read ['0','x',a,b] :: Int)
+
+-- | type of color settings in the ui. "Nothing" is
+-- the default color
+data UiColor = UiColor { uiColor :: Maybe Color }
+
+instance UserReadShow UiColor where
+  userShow (UiColor Nothing) = "default"
+  userShow (UiColor (Just x)) = userShow x
+  userParser =
+    try (string "default" >> (return $ UiColor Nothing))
+    <|> (UiColor <$> Just <$> userParser)
 
 findlist :: Eq a => [(a,b)] -> a -> Maybe b
 findlist [] _ = Nothing

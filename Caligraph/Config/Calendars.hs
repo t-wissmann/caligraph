@@ -10,7 +10,6 @@ import Data.Text.IO as T
 import Data.Ini
 import Control.Monad.IO.Class (liftIO)
 import System.Environment.XDG.BaseDir
-import Text.Read (readEither)
 import Control.Monad.Trans.Except
 import Control.Monad
 
@@ -49,8 +48,8 @@ parseCalendar :: SectionParser CalendarConfig
 parseCalendar section =
     return CalendarConfig
       <*> f "type"
-      <*> withDefault "color" Nothing prettyColor
-      <*> withDefault "color-inv" Nothing prettyColor
+      <*> withDefault "color" Nothing uiColor
+      <*> withDefault "color-inv" Nothing uiColor
       <*> pure section
     where
       f = field section
@@ -60,7 +59,7 @@ parseCalendar section =
             Nothing -> return defaultValue
             Just v ->
               mapLeft (\s -> "invalid value \"" ++ unpack v ++ "\": " ++ s) $
-              fmap f $ readEither $ unpack v
+              fmap f $ userRead $ unpack v
 
 
 field :: HashMap Text Text -> String -> Either String String
