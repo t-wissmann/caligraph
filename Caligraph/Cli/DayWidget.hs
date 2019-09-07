@@ -41,14 +41,13 @@ data St = St
 reminder2widget :: AttrName -> Int -> CB.Incarnation' -> Int -> (Int, Widget n)
 reminder2widget calendarAttr idx r width =
     ( length lines
-    , withAttr (attrName "reminderTitle")
-      $ vBox
+    , vBox
       $ map (\(d,s) ->
           (if length duration == 0
           then (\(x,y) -> y <+> x)
           else (\(x,y) -> x <+> y))
-          (withAttr (calendarAttr <> attrName "text" <> attrName "time") $ str d,
-           withAttr (calendarAttr <> attrName "text") $ txt s))
+          (withAttr (calendarAttr <> attrName "time") $ str d,
+           withAttr (calendarAttr) $ txt s))
       $ zip placeholder lines
     )
   where
@@ -102,7 +101,7 @@ reminder2widget calendarAttr idx r width =
 reminder2widgetInline :: AttrName -> Int -> CB.Incarnation' -> Int -> (Int, Widget n)
 reminder2widgetInline calendarAttr idx r width =
     ( length formatted_lines
-    , withAttr (calendarAttr <> attrName "text")
+    , withAttr (calendarAttr)
       $ vBox formatted_lines
     )
   where
@@ -138,7 +137,7 @@ reminder2widgetInline calendarAttr idx r width =
             [] -> [str ""]
             (hd:tl) ->
                 (:)
-                    ((withAttr (calendarAttr <> attrName "text" <> "time") $ str durationString)
+                    ((withAttr (calendarAttr <> "time") $ str durationString)
                      <+>
                    (str "" <+> (str (drop (length durationString) hd))))
                     (map str tl)
@@ -182,7 +181,7 @@ day2widget st width =
         let isSelected = Just idx == (focus st) in
         let attr = if isSelected
                    then (cisAttrName style) <> "selected"
-                   else (cisAttrName style)
+                   else (cisAttrName style) <> "normal"
         in
         let widgetFunction =
               if width < 20 then reminder2widgetInline else reminder2widget

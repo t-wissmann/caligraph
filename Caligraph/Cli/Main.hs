@@ -379,6 +379,8 @@ mainApp =
         , ("log" <> "timestamp", fg white)
         , ("log" <> "message", defAttr)
         ] ++
+          Rules.ruleAttrMap (_rules s)
+          ++
           do
             (name,cal) <- _calendars s
             let calcfg = CC.calendarConfig cal
@@ -387,21 +389,21 @@ mainApp =
                    (setTo $ CalendarConfig.color calcfg) KeepCurrent
             let prefix = attrName "calendar" <> attrName (T.unpack name)
             [ (prefix <> "filled", attr),
-              (prefix <> "text", attr),
               (prefix <> "text" <> "underline",
                 Attr (SetTo underline) (setTo $ CalendarConfig.colorInv calcfg)
                      (setTo $ CalendarConfig.color calcfg) KeepCurrent),
-              (prefix <> "text" <> "time",
-                Attr (SetTo bold) (setTo $ CalendarConfig.colorInv calcfg)
-                     (setTo $  CalendarConfig.color calcfg) KeepCurrent),
               (prefix <> "separator",
                 Attr Default (SetTo black)
                      (setTo $ CalendarConfig.color calcfg) KeepCurrent),
+              (prefix <> "text" <> "normal", attr),
+              (prefix <> "text" <> "normal" <> "time",
+                Attr (SetTo bold) (setTo $ CalendarConfig.colorInv calcfg)
+                     (setTo $  CalendarConfig.color calcfg) KeepCurrent),
               (prefix <> "text" <> "selected",
                 Attr Default (setTo $ CalendarConfig.color calcfg)
                      (setTo $ CalendarConfig.colorInv calcfg) KeepCurrent),
               (prefix <> "text" <> "selected" <> "time",
-                Attr (SetTo bold) (setTo $  CalendarConfig.color calcfg)
+                Attr (SetTo bold) (setTo $ CalendarConfig.color calcfg)
                      (setTo $ CalendarConfig.colorInv calcfg) KeepCurrent) ]
         )
       }
@@ -522,7 +524,7 @@ day2widget st day =
           inc <- items
           let calName = T.unpack $ fst $ (st^.calendars) !! (fst (CB.itemId inc))
           let attr = attrName "calendar" <> attrName calName <> attrName "text"
-          return (CalItemStyle attr, inc)
+          return $ Rules.tryApplyRules (st^.rules) (CalItemStyle attr, inc)
 
 emptyReminderEditor :: Brick.Editor String WidgetName
 emptyReminderEditor =

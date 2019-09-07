@@ -3,6 +3,7 @@ module Caligraph.Rules where
 import Caligraph.Config.Types
 import Caligraph.Config.Main (getSource)
 import qualified Caligraph.Config.Main as Cfg
+import qualified Caligraph.Backend.Types as CB
 
 import qualified Caligraph.Cli.Types as C
 
@@ -12,7 +13,7 @@ import qualified Data.Text as T
 import Graphics.Vty.Attributes
 import Text.Read
 import Data.Either (partitionEithers)
-import Data.List (intersperse)
+import Data.List (intersperse, isInfixOf)
 import Control.Monad (unless,forM)
 import Control.Monad.Trans.Except
 import Data.Ini
@@ -91,10 +92,38 @@ ruleAttrMap rules = do
   Rule name _ conseqs <- rules
   ItemColor col <- conseqs
   ItemColorInv colInv <- conseqs
-  [ (attrName "rule" <> attrName name,
-      Attr KeepCurrent (setTo col) (setTo colInv) KeepCurrent),
-    (attrName "rule" <> attrName name <> attrName "time",
-      Attr (SetTo bold) (setTo col) (setTo colInv) KeepCurrent)]
+  [ (attrName "rule" <> attrName name <> attrName "normal",
+      Attr Default (setTo colInv) (setTo col) KeepCurrent),
+    (attrName "rule" <> attrName name <> attrName "normal" <> attrName "time",
+      Attr (SetTo bold) (setTo colInv) (setTo col) KeepCurrent),
+    (attrName "rule" <> attrName name <> attrName "selected",
+      Attr Default (setTo col) (setTo colInv) KeepCurrent),
+    (attrName "rule" <> attrName name <> attrName "selected" <> attrName "time",
+      Attr (SetTo bold) (setTo col) (setTo colInv) KeepCurrent) ]
   where
     setTo (UiColor Nothing) = Default
     setTo (UiColor (Just x)) = SetTo x
+
+conditionMatches :: Condition -> CB.Incarnation a -> Bool
+conditionMatches (DescriptionRegex s) inc =
+  s `isInfixOf` (CB.title inc)
+conditionMatches (CalendarName _) inc = False
+
+consequenceApply :: String -> Consequence -> (C.CalItemStyle, CB.Incarnation a)
+                                          -> (C.CalItemStyle, CB.Incarnation a)
+consequenceApply name (ItemVisible _) = id
+consequenceApply name (ItemColor _) = (\(s,inc) ->
+    (s { C.cisAttrName = attrName "rule" <> attrName name }, inc))
+consequenceApply name (ItemColorInv _) = id
+
+tryApplyRule :: Rule -> (C.CalItemStyle, CB.Incarnation a)
+                     -> (C.CalItemStyle, CB.Incarnation a)
+tryApplyRule (Rule name cond consq) (style,inc) =
+  if all (flip conditionMatches inc) cond
+  then foldr (.) id (map (consequenceApply name) consq) (style,inc)
+  else (style,inc)
+
+tryApplyRules :: [Rule] -> (C.CalItemStyle, CB.Incarnation a)
+                     -> (C.CalItemStyle, CB.Incarnation a)
+tryApplyRules rules =
+  foldr (.) id $ map tryApplyRule rules
