@@ -20,6 +20,7 @@ import System.Environment.XDG.BaseDir
 -- then all the consequences are executed
 data Rule =
   Rule {
+    ruleName :: String,
     ruleConditions :: [Condition],
     ruleConsequences :: [Consequence]
   }
@@ -65,14 +66,14 @@ errorName :: Maybe a -> String -> Either String a
 errorName (Just x) _ = Right x
 errorName Nothing s = Left s
 
-parseRule :: SectionParser Rule
-parseRule section = do
+parseRule :: String -> SectionParser Rule
+parseRule name section = do
   let (ls,rs) = partitionEithers $ map parseConditionConsequence (M.toList section)
   unless (null ls) $ -- if ls is not empty
     -- then fail with all error messages present
     Left $ concat $ intersperse ['\n'] ls
   let (condits,conseqs) = partitionEithers rs
-  return (Rule condits conseqs)
+  return (Rule name condits conseqs)
 
 loadRules :: ExceptT String IO [Rule]
 loadRules = do
@@ -80,5 +81,5 @@ loadRules = do
   let sections = M.toList $ unIni ini
   forM sections $ \(secName,items) ->
       withExceptT ((++) $ "in section \"" ++ T.unpack secName ++ "\": ") $
-        except $ parseRule items
+        except $ parseRule (T.unpack secName) items
 
