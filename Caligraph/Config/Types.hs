@@ -129,28 +129,25 @@ instance UserReadShow KeyCombi where
     key <- userParser
     return $ KeyCombi (mods,key)
 
-colornames :: [(Color,String)]
-colornames =
-  [ (,) black "black"
-  , (,) red "red"
-  , (,) green "green"
-  , (,) yellow "yellow"
-  , (,) blue "blue"
-  , (,) magenta "magenta"
-  , (,) cyan "cyan"
-  , (,) white "white"
-  , (,) brightBlack "brightblack"
-  , (,) brightRed "brightred"
-  , (,) brightGreen "brightgreen"
-  , (,) brightYellow "brightyellow"
-  , (,) brightBlue "brightblue"
-  , (,) brightMagenta "brightmagenta"
-  , (,) brightCyan "brightcyan"
-  , (,) brightWhite "brightwhite"
-  ]
-
 instance FinitelyManyNames Color where
-  finitelyManyNames = map (\(a,b) -> (b,a)) colornames
+  finitelyManyNames =
+    [ (,) "black"         black
+    , (,) "red"           red
+    , (,) "green"         green
+    , (,) "yellow"        yellow
+    , (,) "blue"          blue
+    , (,) "magenta"       magenta
+    , (,) "cyan"          cyan
+    , (,) "white"         white
+    , (,) "brightblack"   brightBlack
+    , (,) "brightred"     brightRed
+    , (,) "brightgreen"   brightGreen
+    , (,) "brightyellow"  brightYellow
+    , (,) "brightblue"    brightBlue
+    , (,) "brightmagenta" brightMagenta
+    , (,) "brightcyan"    brightCyan
+    , (,) "brightwhite"   brightWhite
+    ]
 
 instance UserReadShow Color where
   userShow = showName
