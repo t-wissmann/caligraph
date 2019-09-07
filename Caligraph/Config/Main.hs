@@ -9,6 +9,8 @@ import qualified Data.Text.IO as T
 import qualified Data.HashMap.Strict as M
 import System.Environment.XDG.BaseDir
 import Control.Exception
+import Control.Monad.Trans.Except
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad
 import Text.Read
 import qualified Data.List.Split as Split
@@ -27,17 +29,29 @@ evaluateEnvironmentConfig envCfg =
 
 getSource :: String -> IO Text
 getSource path = handle readHandler $ T.readFile path
+
 readHandler :: IOError -> IO Text
 readHandler e
   | isDoesNotExistError e = return $ pack ""
   | otherwise = ioError e
 
+-- | load a config file with given name. If no such file exists,
+-- an empty config is returned
+loadConfigFile
+  :: String
+  -- ^ the name, e.g. config, rules, keys,…
+  -> ExceptT String IO Ini
+  -- ^ return an error message or the file
+loadConfigFile fileName = do
+    path <- liftIO $ getUserConfigFile "caligraph" (fileName ++ ".ini")
+    src <- liftIO $ getSource path
+    except $ parseIni src
+
 load :: IO (Either String Config)
 load = do
-    path <- getUserConfigFile "caligraph" "config.ini"
-    src <- getSource path
+    ini' <- runExceptT $ loadConfigFile "config"
     return $ do
-        ini <- parseIni src
+        ini <- ini'
         let section = parseSection ini
         return Config
           <*> parseSection ini "environment" parseEnvironment
