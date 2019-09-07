@@ -48,3 +48,8 @@ type LogLine = String
 emptyDay :: DayWidget n
 emptyDay _ = (1, str "loading...")
 
+-- | visual style of a calendar item / incarnation
+data CalItemStyle = CalItemStyle
+  { cisAttrName :: AttrName
+  }
+

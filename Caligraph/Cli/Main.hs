@@ -30,6 +30,7 @@ import qualified Caligraph.Config.Calendars as CalendarConfig
 import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
 import qualified Caligraph.Calendar as CC
+import qualified Caligraph.Rules as Rules
 
 import Control.Monad (when)
 import Control.Monad.Loops (whileM_)
@@ -515,7 +516,9 @@ day2widget st day =
     where
       today = st^.dayGrid^.DayGrid.today
       focus = st^.dayGrid^.DayGrid.focusDay
-      reminders = runReader (getReminders day) st
+      reminders = flip runReader st $ do
+        items <- getReminders day
+        return items
 
 emptyReminderEditor :: Brick.Editor String WidgetName
 emptyReminderEditor =

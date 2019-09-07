@@ -4,6 +4,8 @@ import Caligraph.Config.Types
 import Caligraph.Config.Main (getSource)
 import qualified Caligraph.Config.Main as Cfg
 
+import qualified Caligraph.Cli.Types as C
+
 import qualified Data.HashMap.Strict as M
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -15,6 +17,7 @@ import Control.Monad (unless,forM)
 import Control.Monad.Trans.Except
 import Data.Ini
 import System.Environment.XDG.BaseDir
+import Brick.AttrMap
 
 -- | a rule applies of all conditions match, and if this is the case,
 -- then all the consequences are executed
@@ -83,3 +86,15 @@ loadRules = do
       withExceptT ((++) $ "in section \"" ++ T.unpack secName ++ "\": ") $
         except $ parseRule (T.unpack secName) items
 
+ruleAttrMap :: [Rule] -> [(AttrName, Attr)]
+ruleAttrMap rules = do
+  Rule name _ conseqs <- rules
+  ItemColor col <- conseqs
+  ItemColorInv colInv <- conseqs
+  [ (attrName "rule" <> attrName name,
+      Attr KeepCurrent (setTo col) (setTo colInv) KeepCurrent),
+    (attrName "rule" <> attrName name <> attrName "time",
+      Attr (SetTo bold) (setTo col) (setTo colInv) KeepCurrent)]
+  where
+    setTo (UiColor Nothing) = Default
+    setTo (UiColor (Just x)) = SetTo x
