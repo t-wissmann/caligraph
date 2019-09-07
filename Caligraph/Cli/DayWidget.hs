@@ -184,13 +184,14 @@ day2widget st width =
                    then (cisAttrName style) <> "selected"
                    else (cisAttrName style)
         in
+        let widgetFunction =
+              if width < 20 then reminder2widgetInline else reminder2widget
+        in
         (if isSelected
          then (\(a,b) -> (a, showCursor widgetName (Location (w-1,a-1)) $ b))
          else id)
         $ (\(a,b) -> (a, clickable (WNDayItem (day st) idx) b))
-        (if width < 20
-        then reminder2widgetInline attr idx (fmap snd inc) w
-        else reminder2widget attr idx (fmap snd inc) w)
+        $ widgetFunction attr idx (fmap snd inc) w
 
       isTimedReminder :: CB.Incarnation i -> Bool
       isTimedReminder r =
