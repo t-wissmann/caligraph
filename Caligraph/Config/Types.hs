@@ -65,7 +65,7 @@ showName x = case find (\(_,v) -> v == x) finitelyManyNames of
 
 parseName :: FinitelyManyNames a => GenParser Char () a
 parseName =
-  choice $ map (\(n,v) -> string n >> return v) finitelyManyNames
+  choice $ map try $ map (\(n,v) -> string n >> return v) finitelyManyNames
 
 instance FinitelyManyNames Bool where
   finitelyManyNames =
