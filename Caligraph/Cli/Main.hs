@@ -543,8 +543,8 @@ reportDayChangeThread action today = do
     reportDayChangeThread action today' -- repeat it
 
 
-mainFromConfig :: KeyBindings -> [(T.Text,CC.ConfiguredCalendar)] -> IO ()
-mainFromConfig keyconfig cals =
+mainFromConfig :: [Rules.Rule] -> KeyBindings -> [(T.Text,CC.ConfiguredCalendar)] -> IO ()
+mainFromConfig rules keyconfig cals =
   let buildVty = do
         v <- V.mkVty =<< V.standardIOConfig
         V.setMode (V.outputIface v) V.Mouse True
@@ -566,7 +566,7 @@ mainFromConfig keyconfig cals =
   -- init main state
   let initial_state = AppState False day_grid day_range (Just 0) cals_loaded
                         0 [] AMNormal emptyReminderEditor chan tz (-20)
-                        keyconfig
+                        keyconfig rules
 
   bootup_state <- flip execStateT initial_state $
     forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)

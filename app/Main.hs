@@ -74,7 +74,7 @@ mainConfigurable params = do
   -- load rules
   rules <- runExceptT Rules.loadRules >>= rightOrDie
   -- start main application
-  CliM.mainFromConfig (Map.union customBinds defaultBinds) cals
+  CliM.mainFromConfig rules (Map.union customBinds defaultBinds) cals
   where
     rightOrDie = either die return
 

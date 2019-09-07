@@ -5,6 +5,7 @@ module Caligraph.Cli.AppState where
 import Caligraph.Backend.Types as CB
 import Caligraph.Cli.Types
 import Caligraph.Breakpoint
+import qualified Caligraph.Rules as Rules
 import qualified Caligraph.Calendar as Calendar
 import qualified Caligraph.Cli.DayGrid as DayGrid
 import qualified Brick.Widgets.Edit as Brick
@@ -57,6 +58,7 @@ data AppState = AppState
     , _timeZone :: TimeZone
     , _showLogLines :: Int -- number of log lines to show
     , _binds :: Map.Map ([Modifier],Key) (Cmd AppState)
+    , _rules :: [Rules.Rule]
     }
 
 makeLenses ''AppState
