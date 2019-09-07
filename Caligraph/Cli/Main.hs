@@ -574,18 +574,6 @@ mainFromConfig keyconfig cals =
   customMain vty buildVty (Just chan) mainApp bootup_state
   return ()
 
-testmain :: IO ()
-testmain = do
-  -- load main config
-  config <- MainConfig.load >>= rightOrDie
-  MainConfig.evaluateEnvironmentConfig (MainConfig.environment config)
-  -- load key config
-  customBinds <- MainConfig.keyConfigUserPath >>= MainConfig.getSource >>= loadKeyConfig
-  defaultBinds <- loadKeyConfig ConfigDefaults.defaultKeys
-  -- load calendar config
-  cals <- runExceptT (CalendarConfig.loadCalendars CC.fromConfig) >>= rightOrDie
-  mainFromConfig (Map.union customBinds defaultBinds) cals
-
 rightOrDie :: Either String a -> IO a
 rightOrDie = either die return
 
