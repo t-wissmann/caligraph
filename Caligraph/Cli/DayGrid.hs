@@ -158,7 +158,7 @@ init n d =
 
 widthToRowController :: Int -> RowController
 widthToRowController w =
-  if w < 90
+  if w <= 100
   then halfweekPerRow
   else weekPerRow
 
