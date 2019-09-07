@@ -22,8 +22,8 @@ data Condition
 
 data Consequence
   = ItemVisible Bool
-  | ItemColor (Maybe Color)
-  | ItemColorInv (Maybe Color)
+  | ItemColor UiColor
+  | ItemColorInv UiColor
 
 parseCondition :: (Text,Text) -> Either String Condition
 parseCondition (key,value) = do
