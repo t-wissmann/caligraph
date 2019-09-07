@@ -2,6 +2,7 @@ module Caligraph.Rules where
 
 import Caligraph.Config.Types
 import Caligraph.Config.Main (getSource)
+import qualified Caligraph.Config.Main as Cfg
 
 import qualified Data.HashMap.Strict as M
 import Data.Text (Text)
@@ -10,7 +11,9 @@ import Graphics.Vty.Attributes
 import Text.Read
 import Data.Either (partitionEithers)
 import Data.List (intersperse)
-import Control.Monad (unless)
+import Control.Monad (unless,forM)
+import Control.Monad.Trans.Except
+import Data.Ini
 import System.Environment.XDG.BaseDir
 
 -- | a rule applies of all conditions match, and if this is the case,
@@ -70,4 +73,12 @@ parseRule section = do
     Left $ concat $ intersperse ['\n'] ls
   let (condits,conseqs) = partitionEithers rs
   return (Rule condits conseqs)
+
+loadRules :: ExceptT String IO [Rule]
+loadRules = do
+  ini <- Cfg.loadConfigFile "rules"
+  let sections = M.toList $ unIni ini
+  forM sections $ \(secName,items) ->
+      withExceptT ((++) $ "in section \"" ++ T.unpack secName ++ "\": ") $
+        except $ parseRule items
 

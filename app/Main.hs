@@ -9,6 +9,7 @@ import qualified Caligraph.Backend.Registered as CB
 import qualified Caligraph.Config.Main as Cfg
 import qualified Caligraph.Config.Defaults as Cfg
 import qualified Caligraph.Config.Calendars as Cfg
+import qualified Caligraph.Rules as Rules
 
 import Data.Either
 import Control.Monad
@@ -70,6 +71,9 @@ mainConfigurable params = do
           path -> do
             c <- return (filepath2calendar path) >>= rightOrDie
             return [c]
+  -- load rules
+  rules <- runExceptT Rules.loadRules >>= rightOrDie
+  -- start main application
   CliM.mainFromConfig (Map.union customBinds defaultBinds) cals
   where
     rightOrDie = either die return
