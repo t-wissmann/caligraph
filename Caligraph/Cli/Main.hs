@@ -397,10 +397,10 @@ mainApp =
               (prefix <> "separator",
                 Attr Default (SetTo black)
                      (setTo $ CalendarConfig.color calcfg) KeepCurrent),
-              (prefix <> "textSelected",
+              (prefix <> "text" <> "selected",
                 Attr Default (setTo $ CalendarConfig.color calcfg)
                      (setTo $ CalendarConfig.colorInv calcfg) KeepCurrent),
-              (prefix <> "textSelected" <> "time",
+              (prefix <> "text" <> "selected" <> "time",
                 Attr (SetTo bold) (setTo $  CalendarConfig.color calcfg)
                      (setTo $ CalendarConfig.colorInv calcfg) KeepCurrent) ]
         )
@@ -518,7 +518,11 @@ day2widget st day =
       focus = st^.dayGrid^.DayGrid.focusDay
       reminders = flip runReader st $ do
         items <- getReminders day
-        return items
+        return $ do
+          inc <- items
+          let calName = T.unpack $ fst $ (st^.calendars) !! (fst (CB.itemId inc))
+          let attr = attrName "calendar" <> attrName calName <> attrName "text"
+          return (CalItemStyle attr, inc)
 
 emptyReminderEditor :: Brick.Editor String WidgetName
 emptyReminderEditor =

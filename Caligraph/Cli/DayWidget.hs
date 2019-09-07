@@ -30,7 +30,7 @@ import Data.Array
 
 data St = St
     { focus :: Maybe Int -- if this day has the keyboard focus
-    , reminders :: [CB.Incarnation (Int,Ptr)]
+    , reminders :: [(CalItemStyle, CB.Incarnation (Int,Ptr))]
     , day :: Day
     , today :: Day
     , newReminderEditor :: Maybe (Brick.Editor String WidgetName)
@@ -177,23 +177,16 @@ day2widget st width =
             c <- getContext
             return $ emptyResult & imageL .~ (V.charFill (c^.attrL) ch (c^.availWidthL) (c^.availHeightL))
 
-      widget :: Int -> CB.Incarnation (Int,Ptr) -> Int -> (Int, Widget WidgetName)
-      widget idx inc w =
-        let calName = T.unpack $ fst $ (calendars st) !! (fst (CB.itemId inc)) in
-        let attr = attrName "calendar" <> attrName calName in
-        (if Just idx == (focus st)
-        then (\(a,b) ->
-            ( a
-            , showCursor widgetName (Location (w-1,a-1))
-                $ updateAttrMap
-                    (mapAttrNames [ ("selectedReminderTime", "reminderTime")
-                                  , ("selectedReminderTitle", "reminderTitle")
-                                  , (attr <> "textSelected", attr <> "text")
-                                  , (attr <> "textSelected" <> "time", attr <> "text" <> "time")
-                                  ])
-                $ b
-            ))
-        else id)
+      widget :: Int -> (CalItemStyle, CB.Incarnation (Int,Ptr)) -> Int -> (Int, Widget WidgetName)
+      widget idx (style,inc) w =
+        let isSelected = Just idx == (focus st) in
+        let attr = if isSelected
+                   then (cisAttrName style) <> "selected"
+                   else (cisAttrName style)
+        in
+        (if isSelected
+         then (\(a,b) -> (a, showCursor widgetName (Location (w-1,a-1)) $ b))
+         else id)
         $ (\(a,b) -> (a, clickable (WNDayItem (day st) idx) b))
         (if width < 20
         then reminder2widgetInline attr idx (fmap snd inc) w
