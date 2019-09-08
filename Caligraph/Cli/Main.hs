@@ -300,11 +300,12 @@ fixFocusItem = do
     reminders <- readOnly $ getReminders day
     focusItem %= fmap (min $ length reminders - 1)
 
-footer_height = 2
+header_footer_height = 3
 
 drawUI st =
   [vBox $ mapMaybe id
-      [ Just $ DayGrid.render (st^.dayGrid)
+      [ Just $ drawToolBar st
+      , Just $ DayGrid.render (st^.dayGrid)
       , logWindow
       , Just $ drawStatusLine st
       , Just $ input_line
@@ -336,6 +337,21 @@ drawUI st =
         & reverse
         & vBox
         & (forceAttr ("log" <> "border") hBorder <=>)
+
+toolbarcommands =
+  [ add_reminder_cmd
+  , focus_cmd DirLeft
+  , focus_cmd DirRight
+  ]
+
+drawToolBar st =
+  withAttr "statusline" $
+   hBox [
+     clickable (WNToolBarItem 0) $ str " +Add ",
+     clickable (WNToolBarItem 1) $ str "< ",
+     clickable (WNToolBarItem 2) $ str ">"
+   ]
+   <+> (padLeft BT.Max $ (str " "))
 
 drawStatusLine st = withAttr "statusline" $
     hBox (map drawCalendarName $ zip [0..] (st^.calendars))
@@ -495,7 +511,7 @@ myHandleEvent s (VtyEvent e) =
                 execCmd s cmd
             Nothing -> continue s
     EvResize w h ->
-      execCmd s $ dayGrid %= DayGrid.resize (w,h)
+      execCmd s $ dayGrid %= DayGrid.resize (w,h - header_footer_height)
     EvMouseDown _ _ BScrollDown _ ->
       execCmd s $ dayGrid %= DayGrid.scroll scrollStep
     EvMouseDown _ _ BScrollUp _ ->
@@ -532,6 +548,8 @@ myHandleEvent s (MouseDown _ BScrollDown _ _) =
 myHandleEvent s (MouseDown _ BScrollUp _ _) =
       execCmd s $ do dayGrid %= DayGrid.scroll (-scrollStep)
 myHandleEvent s (MouseDown _ _ _ _) = continue s
+myHandleEvent s (MouseUp (WNToolBarItem i) _ _) =
+      execCmd s $ (toolbarcommands !! i)
 myHandleEvent s (MouseUp _ _ _) = continue s
 
 day2widget :: St -> Day -> DayWidget WidgetName

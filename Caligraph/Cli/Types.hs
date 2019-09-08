@@ -34,6 +34,7 @@ data WidgetName =
     | WNDay Day
     | WNDayItem Day Int
     | WNNewReminder
+    | WNToolBarItem Int
     deriving (Ord,Eq,Show)
 
 -- | the type of a day widget
