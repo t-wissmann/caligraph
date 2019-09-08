@@ -79,6 +79,7 @@ library
     , hashable
     , MissingH
     , iCalendar
+    , regex-compat
   default-language:    Haskell2010
 
 executable caligraph

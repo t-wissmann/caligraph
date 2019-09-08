@@ -13,12 +13,14 @@ import qualified Data.Text as T
 import Graphics.Vty.Attributes
 import Text.Read
 import Data.Either (partitionEithers)
-import Data.List (intersperse, isInfixOf)
+import Data.List (intersperse)
 import Control.Monad (unless,forM)
 import Control.Monad.Trans.Except
 import Data.Ini
 import System.Environment.XDG.BaseDir
 import Brick.AttrMap
+import Text.Regex
+import Data.Maybe (isJust)
 
 -- | a rule applies of all conditions match, and if this is the case,
 -- then all the consequences are executed
@@ -31,7 +33,7 @@ data Rule =
 
 data Condition
   = CalendarName String
-  | DescriptionRegex String
+  | DescriptionRegex Regex
 
 data Consequence
   = ItemVisible Bool
@@ -55,8 +57,9 @@ parseConditionConsequence (key,value) = do
     name2condition :: [(String,String -> Condition)]
     name2condition =
       [ (,) "calendar" CalendarName
-      , (,) "description" DescriptionRegex
+      , (,) "description" (DescriptionRegex . regex)
       ]
+    regex reg = mkRegexWithOpts reg False False
     name2consequence :: [(String,String -> Either String Consequence)]
     name2consequence =
       [ c "visible"   ItemVisible
@@ -105,8 +108,8 @@ ruleAttrMap rules = do
     setTo (UiColor (Just x)) = SetTo x
 
 conditionMatches :: Condition -> CB.Incarnation a -> Bool
-conditionMatches (DescriptionRegex s) inc =
-  s `isInfixOf` (CB.title inc)
+conditionMatches (DescriptionRegex s) inc = isJust $
+  s `matchRegex` (CB.title inc)
 conditionMatches (CalendarName _) inc = False
 
 consequenceApply :: String -> Consequence -> (C.CalItemStyle, CB.Incarnation a)
