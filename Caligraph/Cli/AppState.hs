@@ -5,6 +5,7 @@ module Caligraph.Cli.AppState where
 import Caligraph.Backend.Types as CB
 import Caligraph.Cli.Types
 import Caligraph.Breakpoint
+import Caligraph.PointerStore (Ptr)
 import qualified Caligraph.Rules as Rules
 import qualified Caligraph.Calendar as Calendar
 import qualified Caligraph.Cli.DayGrid as DayGrid
@@ -59,6 +60,7 @@ data AppState = AppState
     , _showLogLines :: Int -- number of log lines to show
     , _binds :: Map.Map ([Modifier],Key) (Cmd AppState)
     , _rules :: [Rules.Rule]
+    , _reminders :: Map.Map Day [(CalItemStyle, CB.Incarnation (Int,Ptr))]
     }
 
 makeLenses ''AppState

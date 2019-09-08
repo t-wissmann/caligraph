@@ -258,7 +258,41 @@ forCalendar :: MonadIO m => Int -> CC.CalendarT m a -> StateT St m a
 forCalendar idx prog = do
     cals <- use calendars
     let prependCalName str = (T.unpack $ fst $ cals !! idx) ++ ": " ++ str
-    runMessageWriter prependCalName (zoom (calendar_idx idx) prog)
+    res <- runMessageWriter prependCalName (zoom (calendar_idx idx) prog)
+    -- whenever we do something in a calendar, the
+    -- state may have changed
+    -- rangeVis <- DayGrid.rangeVisible <$> use dayGrid
+    -- updateRemindersCache rangeVis idx
+    return res
+
+updateRemindersCache
+  :: Monad m
+  -- ^ any monad
+  => (Day,Day)
+  -- ^ the day range to update
+  -> Int
+  -- ^ the calendar index
+  -> StateT St m ()
+updateRemindersCache (from,to) idx = do
+    cals <- use calendars
+    let curCal = cals !! idx
+    let calName = T.unpack $ fst curCal
+    let attr = attrName "calendar" <> attrName calName <> attrName "text"
+    rules' <- use rules
+    let formatReminder rem =
+          Rules.tryApplyRules rules'
+            (CalItemStyle attr,fmap (\ptr -> (idx,ptr)) rem)
+    let incsArray = CC.cachedIncarnations (snd curCal) (from,to)
+    forM_ (assocs incsArray) $ \(day,incs) -> do
+      let incsFormatted = map formatReminder incs
+      reminders %= flip Map.alter day (\oldval ->
+          -- get the old entry in the cache without those for 'idx'
+          maybe [] (filter (not . (==) idx . fst . CB.itemId . snd)) oldval
+          -- add the new ones
+          & (++) incsFormatted
+          & L.sortBy (\ a b -> compare (snd a) (snd b))
+          & Just
+          )
 
 fixFocusItem :: Monad m => StateT St m ()
 fixFocusItem = do
@@ -472,8 +506,7 @@ myHandleEvent s (AppEvent ev) =
     execCmd s $ do
       case ev of
         CalendarIO idx -> do
-            forCalendar idx CC.receiveResult
-            forCalendar idx CC.fileQuery
+            forCalendar idx (CC.receiveResult >> CC.fileQuery)
             c <- use (calendar_idx idx)
             s'' <- get
             dayGrid %= (DayGrid.resizeDays $ day2widget s'')
@@ -518,6 +551,7 @@ day2widget st day =
     where
       today = st^.dayGrid^.DayGrid.today
       focus = st^.dayGrid^.DayGrid.focusDay
+      -- reminders = maybe [] id $ Map.lookup day (_reminders st)
       reminders = flip runReader st $ do
         items <- getReminders day
         return $ do
@@ -572,7 +606,7 @@ mainFromConfig rules keyconfig cals =
   -- init main state
   let initial_state = AppState False day_grid day_range (Just 0) cals_loaded
                         0 [] AMNormal emptyReminderEditor chan tz (-20)
-                        keyconfig rules
+                        keyconfig rules Map.empty
 
   bootup_state <- flip execStateT initial_state $
     forEachCalendar (CC.setRangeVisible day_range >> CC.fileQuery)
