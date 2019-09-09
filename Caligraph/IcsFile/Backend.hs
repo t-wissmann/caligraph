@@ -10,9 +10,6 @@ import Data.Either
 import Data.Maybe
 import Data.Foldable
 
-import qualified Text.ICalendar.Types as ICal
-import qualified Text.ICalendar.Parser as ICal
-
 import Data.Time.Calendar
 import qualified Data.Array as A
 import qualified Data.ByteString.Lazy as BS
@@ -27,11 +24,13 @@ import Lens.Micro
 import Lens.Micro.Mtl
 import Lens.Micro.TH
 
+type IcsData = ()
+
 data St = St
     { _path :: String -- a filepath with tilde not yet expanded
     , _idStore :: PS.PointerStore Int
     -- ^ store line numbers of calendar entries
-    , _calendar :: Maybe (ICal.VCalendar)
+    , _calendar :: Maybe (IcsData)
     , _bootup :: Bool
     -- ^ whether we are in the startup phase
     }
@@ -39,7 +38,7 @@ data St = St
 makeLenses ''St
 
 data Event =
-  CalendarLoaded (Either String ([ICal.VCalendar], [String]))
+  CalendarLoaded (Either String (IcsData, [String]))
   | SourceEdited
   | FileChanged Bool
   -- ^ when the file was modified, and whether it still exists
@@ -76,13 +75,11 @@ handleEvent (CB.AddReminder pr) = do
 
 handleEvent (CB.Response (CalendarLoaded cOrError)) = do
   case cOrError of
-    Right ([],warnings) -> do
-      tell [CB.BAError $ "File has no calendars."]
-    Right ((c:_),warnings) -> do
+    Right ((),warnings) -> do
       -- c' <- zoom idStore $ mapM PS.lookupOrInsert c
       -- calendar .= Just c'
       tell [CB.BALog $ "Calendar loaded with "
-            ++ (show $ length $ ICal.vcEvents c) ++ " events"]
+            ++ (show $ 1234) ++ " events"]
       forM_ warnings (\w -> tell [CB.BAError w])
       return ()
     Left error -> tell [CB.BAError error]
@@ -99,7 +96,7 @@ reloadFile = do
   CB.callback ("Loading " ++ fp) $ fmap CalendarLoaded $ do
     fullpath <- CU.expandTilde fp
     input <- BS.readFile fullpath
-    return $ ICal.parseICalendar def fp input
+    return $ Right ((), []) -- fp input
   where mapLeft f = either (Left . f) Right
 
 backend :: CB.Backend St Event

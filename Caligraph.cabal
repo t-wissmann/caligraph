@@ -78,7 +78,6 @@ library
     , unordered-containers
     , hashable
     , MissingH
-    , iCalendar
     , regex-compat
   default-language:    Haskell2010
 
