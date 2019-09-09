@@ -125,11 +125,13 @@ commands = Map.fromList
   [ (,) "quit" $ return quit_cmd
   , (,) "edit-src" $ return edit_externally_cmd
   , (,) "add" $ return add_reminder_cmd
-  , (,) "goto-today" $ return (dayGrid %= DayGrid.gotoToday)
+  , (,) "goto-today" $ return goto_today_cmd
   , (,) "scroll-page" $
     return (\d -> dayGrid %= DayGrid.scrollPage d) <*> a
   , (,) "focus-month" $
     return focus_month_relative_cmd <*> a
+  , (,) "focus-week" $
+    return focus_week_relative_cmd <*> a
   , (,) "shell" $ return shell_cmd <*> a
   , (,) "toggle-log" $ return toggle_log_cmd
   , (,) "focus" $ return focus_cmd <*> a
@@ -143,6 +145,10 @@ quit_cmd :: Cmd St
 quit_cmd =
     aboutToQuit .= True
 
+goto_today_cmd :: Cmd St
+goto_today_cmd =
+   dayGrid %= DayGrid.gotoToday
+
 log_message :: MonadIO m => String -> StateT St m ()
 log_message msg = do
     now <- liftIO getCurrentTime
@@ -155,6 +161,11 @@ toggle_log_cmd =
 focus_month_relative_cmd :: Integer -> Cmd St
 focus_month_relative_cmd diff = do
     dayGrid %= DayGrid.modifyFocus (addGregorianMonthsClip diff)
+
+focus_week_relative_cmd :: Integer -> Cmd St
+focus_week_relative_cmd diff = do
+    dayGrid %= DayGrid.modifyFocus (addDays (diff * 7))
+
 
 focus_cmd :: Dir -> Cmd St
 focus_cmd dir = do
@@ -340,16 +351,18 @@ drawUI st =
 
 toolbarcommands =
   [ add_reminder_cmd
-  , focus_cmd DirLeft
-  , focus_cmd DirRight
+  , goto_today_cmd
+  , focus_week_relative_cmd (-1)
+  , focus_week_relative_cmd 1
   ]
 
 drawToolBar st =
   withAttr "statusline" $
    hBox [
      clickable (WNToolBarItem 0) $ str " +Add ",
-     clickable (WNToolBarItem 1) $ str "< ",
-     clickable (WNToolBarItem 2) $ str ">"
+     clickable (WNToolBarItem 1) $ str " Today ",
+     clickable (WNToolBarItem 2) $ str " <",
+     clickable (WNToolBarItem 3) $ str " >"
    ]
    <+> (padLeft BT.Max $ (str " "))
 
