@@ -29,6 +29,8 @@ library
     Caligraph.Remind.Types
     Caligraph.Remind.Backend
     Caligraph.IcsFile.Backend
+    Caligraph.IcsFile.Types
+    Caligraph.IcsFile.Parser
     Caligraph.Plaintext.Backend
     Caligraph.RemindPipe.Parser
     Caligraph.RemindPipe.Types
