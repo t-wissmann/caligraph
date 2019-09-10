@@ -11,15 +11,13 @@ foo = "bar"
 type IcsLine = (Int,String)
 
 parseLines :: GenParser Char st [(SourcePos,String)]
-parseLines = many $ do
+parseLines = flip sepEndBy (char '\n') $ do
     c <- noneOf " "
     pos <- getPosition
     s <- many1 (noneOf "\n")
-    char '\n'
     indentLines <- many $ do
-      char ' '
+      try (char '\n' >> char ' ')
       s <- many (noneOf "\n")
-      char '\n'
       return s
     return $ (pos, (c:s) ++ concat indentLines)
 
