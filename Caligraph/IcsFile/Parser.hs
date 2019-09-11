@@ -11,7 +11,7 @@ foo = "bar"
 type IcsLine = (Int,String)
 
 parseLines :: GenParser Char st [(SourcePos,String)]
-parseLines = flip sepEndBy (char '\n') $ do
+parseLines = flip sepEndBy (many1 $ char '\n') $ do
     c <- noneOf " "
     pos <- getPosition
     s <- many1 (noneOf "\n")
@@ -28,5 +28,5 @@ parse
   -> String
   -- ^ the file's content
   -> Either ParseError [(SourcePos,String)]
-parse fp input =
-  P.parse parseLines fp input
+parse fp =
+  P.parse parseLines fp . filter ((/=) '\r')
