@@ -21,6 +21,25 @@ parseLines = flip sepEndBy (many1 $ char '\n') $ do
       return s
     return $ (pos, (c:s) ++ concat indentLines)
 
+-- | a param is: name = value[, …]
+type Param = (String, [String])
+type ContentLine = (String, [Param], String)
+
+parseName :: GenParser Char st String
+parseName = many1 $ oneOf $ ['0'..'9'] ++ "-" ++ ['a'..'z'] ++ ['A'..'Z']
+
+parseParam :: GenParser Char st Param
+parseParam = error "sdf"
+
+parseValue :: GenParser Char st String
+parseValue = error "not yet defined"
+
+
+parseContentLine :: GenParser Char st ContentLine
+parseContentLine =
+   (,,) <$> parseName
+        <*> many (char ';' >> parseParam)
+        <*> (char ':' >> parseValue <* many (char '\r') <* char '\n')
 
 parse
   :: String
