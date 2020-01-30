@@ -15,8 +15,8 @@ type IcsLine = (Int,String)
 
 parseLines :: GenParser Char st [(SourcePos,String)]
 parseLines = flip sepEndBy (many1 $ char '\n') $ do
-    c <- noneOf " "
     pos <- getPosition
+    c <- noneOf " "
     s <- many (noneOf "\n")
     indentLines <- many $ do
       try (char '\n' >> oneOf " \t")
