@@ -117,7 +117,7 @@ instance UserReadShow Modifier where
   userShow = showName
   userParser = parseName
 
-data KeyCombi = KeyCombi {keyCombi :: ([Modifier], Key)} deriving (Eq,Ord) -- a list of modifiers and a key
+data KeyCombi = KeyCombi {keyCombi :: ([Modifier], Key)} deriving (Eq,Ord,Show) -- a list of modifiers and a key
 
 instance UserReadShow KeyCombi where
   userShow (KeyCombi (mods, key)) =
