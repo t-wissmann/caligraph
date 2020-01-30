@@ -7,6 +7,7 @@ import Text.ParserCombinators.Parsec.Token
 import qualified Text.ParserCombinators.Parsec as P
 
 import Data.Char
+import Data.Either
 
 foo = "bar"
 
@@ -58,7 +59,6 @@ parseValue = (char '"' >> many qsafeChar <* char '"')
         control = map chr $ [0x00..0x08] ++ [0x0A..0x1F] ++ [0x7F]
 
 
-
 parseContentLine :: GenParser Char st ContentLine
 parseContentLine =
    (,,) <$> parseName
@@ -70,6 +70,9 @@ parse
   -- ^ the filepath/title for error messages
   -> String
   -- ^ the file's content
-  -> Either ParseError [(SourcePos,String)]
-parse fp =
-  P.parse parseLines fp . filter ((/=) '\r')
+  -> ([ParseError], [(SourcePos,ContentLine)])
+parse fp filecontent = partitionEithers $
+  case (P.parse parseLines fp $ filter ((/=) '\r') filecontent) of
+    Left parseError -> [Left parseError]
+    Right lines ->
+        map (\(sp,str) -> (,) sp <$> P.parse parseContentLine (fp ++ show sp) str) lines
