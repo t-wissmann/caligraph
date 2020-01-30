@@ -20,6 +20,7 @@ testUnfoldLines = do
   "a\n" `unfoldsTo` ["a"]
   "a\nb\nc\n" `unfoldsTo` ["a","b","c"]
   "a\nb\nc " `unfoldsTo` ["a","b","c "]
+  "a\nb\n c\nd" `unfoldsTo` ["a","bc","d"]
   where
     unfoldsTo content lines =
         Right lines =!= (fmap (map snd) $ unfoldLines "" content)
