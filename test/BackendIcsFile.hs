@@ -33,6 +33,7 @@ testContentLineParser = do
     "BEGIN;X=Y:FOO" ===> ("BEGIN",[("X","Y",[])],"FOO")
     "BEGIN;X=Y,Z:FOO" ===> ("BEGIN",[("X","Y",["Z"])],"FOO")
     "BEGIN;X=Y,Z,Z:FOO" ===> ("BEGIN",[("X","Y",["Z","Z"])],"FOO")
+    "BEGIN;X=\"Y,Z\",Z:FOO" ===> ("BEGIN",[("X","Y,Z",["Z"])],"FOO")
     where
       (===>) src cl =
         Right cl =!= P.parse parseContentLine "" src
