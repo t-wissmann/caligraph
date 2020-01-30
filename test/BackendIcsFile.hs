@@ -2,12 +2,14 @@ module BackendIcsFile where
 
 import Tester
 import Caligraph.IcsFile.Parser
+import qualified Text.ParserCombinators.Parsec as P
 import Control.Monad
 import Data.Ix
 import Data.List
 
 testBackendIcsFile = do
   testUnfoldLines
+  testContentLineParser
 
 testUnfoldLines :: TestM ()
 testUnfoldLines = do
@@ -24,4 +26,14 @@ testUnfoldLines = do
   where
     unfoldsTo content lines =
         Right lines =!= (fmap (map snd) $ unfoldLines "" content)
+
+testContentLineParser :: TestM ()
+testContentLineParser = do
+    "BEGIN:FOO" ===> ("BEGIN",[],"FOO")
+    "BEGIN;X=Y:FOO" ===> ("BEGIN",[("X","Y",[])],"FOO")
+    "BEGIN;X=Y,Z:FOO" ===> ("BEGIN",[("X","Y",["Z"])],"FOO")
+    "BEGIN;X=Y,Z,Z:FOO" ===> ("BEGIN",[("X","Y",["Z","Z"])],"FOO")
+    where
+      (===>) src cl =
+        Right cl =!= P.parse parseContentLine "" src
 
