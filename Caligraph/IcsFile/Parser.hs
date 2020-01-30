@@ -17,7 +17,7 @@ parseLines :: GenParser Char st [(SourcePos,String)]
 parseLines = flip sepEndBy (many1 $ char '\n') $ do
     c <- noneOf " "
     pos <- getPosition
-    s <- many1 (noneOf "\n")
+    s <- many (noneOf "\n")
     indentLines <- many $ do
       try (char '\n' >> oneOf " \t")
       s <- many (noneOf "\n")
