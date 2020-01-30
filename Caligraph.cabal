@@ -108,6 +108,7 @@ test-suite Caligraph-test
                      , Utils
                      , BackendUtils
                      , BackendRemind
+                     , BackendIcsFile
                      , Config
   build-depends:       base
                      , Caligraph

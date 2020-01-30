@@ -66,6 +66,15 @@ parseContentLine =
         <*> many (char ';' >> parseParam)
         <*> (char ':' >> parseValue)
 
+unfoldLines
+  :: String
+  -- ^ the filepath/title for error messages
+  -> String
+  -- ^ the file's content
+  -> Either ParseError [(SourcePos,String)]
+unfoldLines fp =
+    P.parse parseLines fp . filter ((/=) '\r')
+
 parse
   :: String
   -- ^ the filepath/title for error messages
@@ -73,7 +82,7 @@ parse
   -- ^ the file's content
   -> ([ParseError], [(SourcePos,ContentLine)])
 parse fp filecontent = partitionEithers $
-  case (P.parse parseLines fp $ filter ((/=) '\r') filecontent) of
+  case (unfoldLines fp filecontent) of
     Left parseError -> [Left parseError]
     Right lines ->
         map (\(sp,str) -> (,) sp <$> P.parse parseContentLine (fp ++ show sp) str) lines
