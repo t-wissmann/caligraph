@@ -14,6 +14,8 @@ testUnfoldLines = do
   "foo\n bar" `unfoldsTo` ["foobar"]
   "foobar" `unfoldsTo` ["foobar"]
   "foo\n bar\n  baz" `unfoldsTo` ["foobar baz"]
+  "foo\n\tbar" `unfoldsTo` ["foobar"]
+  "foo\n bar\n\t baz\nextra" `unfoldsTo` ["foobar baz", "extra"]
   where
     unfoldsTo content lines =
         Right lines =!= (fmap (map snd) $ unfoldLines "" content)

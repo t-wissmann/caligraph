@@ -19,7 +19,7 @@ parseLines = flip sepEndBy (many1 $ char '\n') $ do
     pos <- getPosition
     s <- many1 (noneOf "\n")
     indentLines <- many $ do
-      try (char '\n' >> char ' ')
+      try (char '\n' >> oneOf " \t")
       s <- many (noneOf "\n")
       return s
     return $ (pos, (c:s) ++ concat indentLines)
