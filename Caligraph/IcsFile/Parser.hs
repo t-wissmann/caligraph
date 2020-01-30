@@ -34,6 +34,11 @@ parseParam = (,,) <$> parseName
                   <*> (char '=' >> parseValue)
                   <*> many (char ',' >> parseValue)
 
+-- | parse a param-value
+--
+-- Currently, we ignore case-insensitivity. The RFC5545 in sec 3.2 says:
+-- "Property parameter values that are not in quoted-strings are
+-- case-insensitive."
 parseValue :: GenParser Char st String
 parseValue = (char '"' >> many qsafeChar <* char '"')
     <|> many safeChar
