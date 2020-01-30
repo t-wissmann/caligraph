@@ -9,8 +9,6 @@ import qualified Text.ParserCombinators.Parsec as P
 import Data.Char
 import Data.Either
 
-foo = "bar"
-
 type IcsLine = (Int,String)
 
 parseLines :: GenParser Char st [(SourcePos,String)]
@@ -23,10 +21,6 @@ parseLines = flip sepEndBy (many1 $ char '\n') $ do
       s <- many (noneOf "\n")
       return s
     return $ (pos, (c:s) ++ concat indentLines)
-
--- | a param is: name = value[, …]
-type Param = (String, String, [String])
-type ContentLine = (String, [Param], String)
 
 -- | parse param-name, here we do not distinguish between iana-token
 -- and x-name
