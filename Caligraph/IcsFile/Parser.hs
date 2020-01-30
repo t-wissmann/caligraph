@@ -37,8 +37,8 @@ parseName = many1 $ oneOf $ ['0'..'9'] ++ "-" ++ ['a'..'z'] ++ ['A'..'Z']
 -- param         = param-name "=" param-value *("," param-value)
 parseParam :: GenParser Char st Param
 parseParam = (,,) <$> parseName
-                  <*> parseValue
-                  <*> (parseValue  `sepBy` (char ','))
+                  <*> (char '=' >> parseValue)
+                  <*> many (char ',' >> parseValue)
 
 parseValue :: GenParser Char st String
 parseValue = (char '"' >> many qsafeChar <* char '"')
@@ -64,7 +64,7 @@ parseContentLine :: GenParser Char st ContentLine
 parseContentLine =
    (,,) <$> parseName
         <*> many (char ';' >> parseParam)
-        <*> (char ':' >> parseValue <* char '\n')
+        <*> (char ':' >> parseValue)
 
 parse
   :: String
