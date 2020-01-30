@@ -38,7 +38,7 @@ parseName = many1 $ oneOf $ ['0'..'9'] ++ "-" ++ ['a'..'z'] ++ ['A'..'Z']
 parseParam :: GenParser Char st Param
 parseParam = (,,) <$> parseName
                   <*> parseValue
-                  <*> many (sepBy (char ',') parseValue)
+                  <*> (parseValue  `sepBy` (char ','))
 
 parseValue :: GenParser Char st String
 parseValue = (char '"' >> many qsafeChar <* char '"')
@@ -59,11 +59,12 @@ parseValue = (char '"' >> many qsafeChar <* char '"')
         control = map chr $ [0x00..0x08] ++ [0x0A..0x1F] ++ [0x7F]
 
 
+-- | parse content lines in the sense of section 3.1 of RFC5545
 parseContentLine :: GenParser Char st ContentLine
 parseContentLine =
    (,,) <$> parseName
         <*> many (char ';' >> parseParam)
-        <*> (char ':' >> parseValue <* many (char '\r') <* char '\n')
+        <*> (char ':' >> parseValue <* char '\n')
 
 parse
   :: String
