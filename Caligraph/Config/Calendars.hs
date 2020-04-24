@@ -17,6 +17,8 @@ import Graphics.Vty.Attributes
 
 data CalendarConfig = CalendarConfig
     { backendType :: String
+    , configFilePath :: FilePath
+    -- ^ the filepath of this config file
     , color :: Maybe Color
     -- ^ the main color of this calendar (Nothing = default)
     , colorInv :: Maybe Color
@@ -31,11 +33,11 @@ loadConfig = do
     path <- liftIO $ getUserConfigFile "caligraph" "calendars.ini"
     src <- liftIO $ T.readFile path
     ini <- except $ parseIni src
-    mapM parseSection $ M.toList $ unIni ini
+    mapM (parseSection path) $ M.toList $ unIni ini
     where
-    parseSection (a,b) =
+    parseSection path (a,b) =
         withExceptT (\s -> "In section \"" ++ unpack a ++ "\": " ++ s) $
-        return ((,) a) <*> except (parseCalendar b)
+        return ((,) a) <*> except (parseCalendar path b)
 
 loadCalendars :: (CalendarConfig -> ExceptT String IO a) -> ExceptT String IO [(Text, a)]
 loadCalendars fromConfig = do
@@ -44,10 +46,15 @@ loadCalendars fromConfig = do
     c' <- fromConfig c
     return (t,c'))
 
-parseCalendar :: SectionParser CalendarConfig
-parseCalendar section =
+parseCalendar
+    :: FilePath
+    -- ^ the filepath of the config file
+    -> SectionParser CalendarConfig
+    -- ^ a section parser
+parseCalendar configFilePath section =
     return CalendarConfig
       <*> f "type"
+      <*> pure configFilePath
       <*> withDefault "color" Nothing uiColor
       <*> withDefault "color-inv" Nothing uiColor
       <*> pure section

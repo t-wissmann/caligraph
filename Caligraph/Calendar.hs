@@ -28,6 +28,7 @@ import Lens.Micro.TH
 import Lens.Micro.Mtl
 
 import System.Directory (getHomeDirectory)
+import System.FilePath (takeDirectory, joinPath)
 
 import Control.Monad.Identity
 import Control.Monad.Trans.Except
@@ -134,7 +135,17 @@ fromConfig cc = do
                 relpath_tilde <- fmap T.unpack $ M.lookup (T.pack x) $ Conf.allSettings cc
                 let relpath = runIdentity $
                                 CU.expandTildeForHome relpath_tilde (return homeDir)
-                return relpath
+                return $
+                  case relpath of
+                    ('/':_) -> relpath -- path is already absolute
+                    _ ->
+                      if (Conf.configFilePath cc == "")
+                      then relpath  -- keep relative
+                      else
+                      -- interpret relpath relative to the location of the
+                      -- calendar config file.
+                      let dir = takeDirectory (Conf.configFilePath cc) in
+                      joinPath [dir, relpath]
         }
 
 setRangeVisible :: Monad m => (Day,Day) -> CalendarT m ()

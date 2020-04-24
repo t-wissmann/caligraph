@@ -84,7 +84,7 @@ filepath2calendar filepath = do
   backName <- case possibleBackends of
               [] -> throwE $ "Can not detect file type of " ++ filepath
               ((_,back):_) -> return back
-  calCfg <- except $ Cfg.parseCalendar $ HMap.fromList $ toText
+  calCfg <- except $ Cfg.parseCalendar "" $ HMap.fromList $ toText
             [ ("type", backName)
             , ("path", filepath)
             , ("color", "blue")
