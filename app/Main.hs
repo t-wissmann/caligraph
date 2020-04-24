@@ -28,6 +28,9 @@ import Data.Maybe (isJust)
 
 data CliOpts = CliOpts
   { calendarfFile :: FilePath
+  -- ^ filepath of a particular calendar to open
+  , calendarsIni :: Maybe FilePath
+  -- ^ filepath of the calendars.ini file
   }
 
 mainOld :: IO ()
@@ -47,6 +50,7 @@ optparse = CliOpts
     <> short 'f'
     <> value ""
     <> help "Calendar file to open (instead of configured calendars)" )
+  <*> pure Nothing -- to be implemented
 
 main :: IO ()
 main = do
@@ -67,7 +71,8 @@ mainConfigurable params = do
   defaultBinds <- CliM.loadKeyConfig Cfg.defaultKeys
   -- load calendar config
   cals <- case calendarfFile params of
-          "" -> runExceptT (Cfg.loadCalendars CC.fromConfig) >>= rightOrDie
+          "" -> runExceptT (Cfg.loadCalendars CC.fromConfig (calendarsIni params))
+                >>= rightOrDie
           path -> do
             c <- runExceptT (filepath2calendar path) >>= rightOrDie
             return [c]

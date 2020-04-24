@@ -28,9 +28,16 @@ data CalendarConfig = CalendarConfig
 
 type RawCalList = [(Text, CalendarConfig)]
 
-loadConfig :: ExceptT String IO RawCalList
-loadConfig = do
-    path <- liftIO $ getUserConfigFile "caligraph" "calendars.ini"
+-- | load the calendars.ini file
+loadConfig
+    :: Maybe FilePath
+    -- ^ the filepath, defaulting to ~/.config/caligraph/calendars.ini
+    -> ExceptT String IO RawCalList
+    -- ^ the loaded calendar list
+loadConfig maybe_calendars_ini = do
+    path <- case maybe_calendars_ini of
+        Just fp -> return fp
+        Nothing -> liftIO $ getUserConfigFile "caligraph" "calendars.ini"
     src <- liftIO $ T.readFile path
     ini <- except $ parseIni src
     mapM (parseSection path) $ M.toList $ unIni ini
@@ -39,9 +46,14 @@ loadConfig = do
         withExceptT (\s -> "In section \"" ++ unpack a ++ "\": " ++ s) $
         return ((,) a) <*> except (parseCalendar path b)
 
-loadCalendars :: (CalendarConfig -> ExceptT String IO a) -> ExceptT String IO [(Text, a)]
-loadCalendars fromConfig = do
-  raw_calendars <- loadConfig
+loadCalendars
+    :: (CalendarConfig -> ExceptT String IO a)
+    -- ^ initialization of calendars, hidden as the type 'a'
+    -> Maybe FilePath
+    -- ^ a possibly alternate filepath of the calendars.ini
+    -> ExceptT String IO [(Text, a)]
+loadCalendars fromConfig maybe_calendars_ini = do
+  raw_calendars <- loadConfig maybe_calendars_ini
   forM raw_calendars (\(t,c) -> do
     c' <- fromConfig c
     return (t,c'))
