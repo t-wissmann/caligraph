@@ -97,10 +97,17 @@ data Event event =
     | AddReminder PartialReminder
     | Response event
 
+type ConfigGetter a = String -> Maybe a
+
+data ConfigRead = ConfigRead
+  { configString :: ConfigGetter String
+  -- , configFilePath :: String -> Maybe FilePath
+  }
+
 type WakeUpLoop event = (event -> IO ()) -> IO ()
 
 data Backend state event = Backend
-  { create :: (String -> Maybe String) -> Either String (state, WakeUpLoop event)
+  { create :: ConfigRead -> Either String (state, WakeUpLoop event)
   , cachedIncarnations :: state -> (Day,Day) -> Incarnations'
   , handleEvent :: Event event -> BackendM state event ()
   , itemSource :: Ptr -> BackendM state event (ItemSource event)

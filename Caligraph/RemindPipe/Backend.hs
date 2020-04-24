@@ -122,14 +122,15 @@ wakeUpLoop st reportEvent = do
     filepath <- liftIO $ expandTilde (st^.path)
     CU.watchFile filepath (\exists -> reportEvent $ FileSystem exists filepath)
 
-parseConfig :: (String -> Maybe String) -> Either String (St, CB.WakeUpLoop Event)
-parseConfig cfg =
-    case (cfg "path") of
-        Just path ->
-            let path_nr = fromMaybe path (cfg "path_append") in
-            let state = St path path_nr M.empty M.empty PS.empty in
-            return (state, wakeUpLoop state)
-        Nothing -> Left "Mandatory setting 'path' missing"
+parseConfig :: CB.ConfigRead -> Either String (St, CB.WakeUpLoop Event)
+parseConfig cfg = do
+    path <- mandatory CB.configString "path"
+    path_nr <- optional CB.configString "path_append" path
+    let state = St path path_nr M.empty M.empty PS.empty
+    return (state, wakeUpLoop state)
+    where
+      mandatory = CB.mandatory cfg
+      optional = CB.optional cfg
 
 requestYear :: FilePath -> Integer -> IO Event
 requestYear tilde_path (y) =

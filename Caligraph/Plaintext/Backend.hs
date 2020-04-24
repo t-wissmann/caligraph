@@ -57,15 +57,13 @@ data Event =
   | FileChanged Bool
   -- ^ when the file was modified, and whether it still exists
 
-parseConfig :: (String -> Maybe String) -> Either String (St, CB.WakeUpLoop Event)
+parseConfig :: CB.ConfigRead -> Either String (St, CB.WakeUpLoop Event)
 parseConfig cfg = do
-  path <- mandatory "path"
+  path <- mandatory CB.configString "path"
   let st = St path PS.empty Nothing True
   return (st, wakeUpLoop st)
   where
-    mandatory :: String -> Either String String
-    mandatory key =
-      maybe (Left $ "Mandatory key " ++ key ++ " missing") Right (cfg key)
+    mandatory = CB.mandatory cfg
 
 wakeUpLoop :: St -> CB.WakeUpLoop Event
 wakeUpLoop st reportEvent = do

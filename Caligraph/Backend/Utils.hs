@@ -114,4 +114,16 @@ parseTimeDuration buf =
                     then (from, to `diffTime` from)
                     else (from, from `diffTime` to)
 
-
+-- | a wrapper saying that a certain field in the config is mandatory
+mandatory :: ConfigRead -> (ConfigRead -> ConfigGetter a) -> String -> Either String a
+mandatory cfg getter key =
+    case (getter cfg key) of
+        Nothing -> Left $ "Mandatory key " ++ key ++ " missing"
+        Just x -> Right x
+--
+-- | a wrapper saying that a certain field in the config is optional
+optional :: ConfigRead -> (ConfigRead -> ConfigGetter a) -> String -> a -> Either String a
+optional cfg getter key defaultValue =
+    case (getter cfg key) of
+        Nothing -> Right defaultValue
+        Just x -> Right x

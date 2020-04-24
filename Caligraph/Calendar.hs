@@ -120,8 +120,11 @@ fromConfig cc = do
         return $ Calendar $ RawCalendar state be [] args results wakeUpChan False thread cc
     where
         bet = Conf.backendType cc
-        getOption :: String -> Maybe String
-        getOption x = fmap T.unpack $ M.lookup (T.pack x) $ Conf.allSettings cc
+        getOption :: CB.ConfigRead
+        getOption = CB.ConfigRead {
+            CB.configString = \x ->
+                fmap T.unpack $ M.lookup (T.pack x) $ Conf.allSettings cc
+        }
 
 setRangeVisible :: Monad m => (Day,Day) -> CalendarT m ()
 setRangeVisible range = doCalendar $ do zoomBackendEvent $ CB.SetRangeVisible range
