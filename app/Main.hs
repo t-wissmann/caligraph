@@ -69,7 +69,7 @@ mainConfigurable params = do
   cals <- case calendarfFile params of
           "" -> runExceptT (Cfg.loadCalendars CC.fromConfig) >>= rightOrDie
           path -> do
-            c <- return (filepath2calendar path) >>= rightOrDie
+            c <- runExceptT (filepath2calendar path) >>= rightOrDie
             return [c]
   -- load rules
   rules <- runExceptT Rules.loadRules >>= rightOrDie
@@ -78,13 +78,13 @@ mainConfigurable params = do
   where
     rightOrDie = either die return
 
-filepath2calendar :: FilePath -> Either String (T.Text,CC.ConfiguredCalendar)
+filepath2calendar :: FilePath -> ExceptT String IO (T.Text,CC.ConfiguredCalendar)
 filepath2calendar filepath = do
   let possibleBackends = filter (\(r,_) -> r `matches` filepath) CB.pathRegex2backend
   backName <- case possibleBackends of
-              [] -> Left $ "Can not detect file type of " ++ filepath
-              ((_,back):_) -> Right back
-  calCfg <- Cfg.parseCalendar $ HMap.fromList $ toText
+              [] -> throwE $ "Can not detect file type of " ++ filepath
+              ((_,back):_) -> return back
+  calCfg <- except $ Cfg.parseCalendar $ HMap.fromList $ toText
             [ ("type", backName)
             , ("path", filepath)
             , ("color", "blue")

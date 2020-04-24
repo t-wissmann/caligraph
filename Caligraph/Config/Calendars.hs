@@ -37,11 +37,11 @@ loadConfig = do
         withExceptT (\s -> "In section \"" ++ unpack a ++ "\": " ++ s) $
         return ((,) a) <*> except (parseCalendar b)
 
-loadCalendars :: (CalendarConfig -> Either String a) -> ExceptT String IO [(Text, a)]
+loadCalendars :: (CalendarConfig -> ExceptT String IO a) -> ExceptT String IO [(Text, a)]
 loadCalendars fromConfig = do
   raw_calendars <- loadConfig
   forM raw_calendars (\(t,c) -> do
-    c' <- except $ fromConfig c
+    c' <- fromConfig c
     return (t,c'))
 
 parseCalendar :: SectionParser CalendarConfig

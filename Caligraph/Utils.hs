@@ -37,11 +37,23 @@ safeArray arr i =
     (f,t) = A.bounds arr
 
 expandTilde :: FilePath -> IO FilePath
-expandTilde s =
+expandTilde s = do
+    expandTildeForHome s getHomeDirectory
+
+expandTildeForHome
+    :: Monad m
+    -- ^ the monad to run in
+    => FilePath
+    -- ^ filepath to expand
+    -> m FilePath
+    -- ^ a function that returns the home
+    -> m FilePath
+    -- ^ possibly absolute filepath
+expandTildeForHome s homeGetter = do
     case s of
-     ['~'] -> getHomeDirectory
+     ['~'] -> homeGetter
      ('~':'/':tl) -> do
-        home <- getHomeDirectory
+        home <- homeGetter
         return $ joinPath [home, tl]
      x -> return x
 

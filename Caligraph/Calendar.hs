@@ -27,6 +27,11 @@ import Lens.Micro
 import Lens.Micro.TH
 import Lens.Micro.Mtl
 
+import System.Directory (getHomeDirectory)
+
+import Control.Monad.Identity
+import Control.Monad.Trans.Except
+import Control.Monad.IO.Class
 import Control.Concurrent.MVar
 import Control.Concurrent.Chan
 import Control.Concurrent
@@ -100,11 +105,12 @@ doCalendar computation = do
     put (Calendar rc')
     return r
 
-fromConfig :: Conf.CalendarConfig -> Either String ConfiguredCalendar
+fromConfig :: Conf.CalendarConfig -> ExceptT String IO ConfiguredCalendar
 fromConfig cc = do
-    (_,CBR.SomeBackend be) <- maybe (Left $ "No backend named \"" ++ bet ++ "\"") Right $
+    (_,CBR.SomeBackend be) <- except $ maybe (Left $ "No backend named \"" ++ bet ++ "\"") Right $
         find ((==) bet . fst) CBR.backends
-    (state,wakeUpLoop) <- CB.create be getOption
+    homeDir <- liftIO getHomeDirectory
+    (state,wakeUpLoop) <- except $ CB.create be (getOption homeDir)
     return $ \noticeDataReady noticeWakeUp -> do
         args <- newEmptyMVar
         results <- newEmptyMVar
@@ -120,10 +126,15 @@ fromConfig cc = do
         return $ Calendar $ RawCalendar state be [] args results wakeUpChan False thread cc
     where
         bet = Conf.backendType cc
-        getOption :: CB.ConfigRead
-        getOption = CB.ConfigRead {
-            CB.configString = \x ->
-                fmap T.unpack $ M.lookup (T.pack x) $ Conf.allSettings cc
+        getOption :: FilePath -> CB.ConfigRead
+        getOption homeDir = CB.ConfigRead {
+            CB.configString = (\x ->
+                fmap T.unpack $ M.lookup (T.pack x) $ Conf.allSettings cc)
+        ,   CB.configFilePath = \x -> do
+                relpath_tilde <- fmap T.unpack $ M.lookup (T.pack x) $ Conf.allSettings cc
+                let relpath = runIdentity $
+                                CU.expandTildeForHome relpath_tilde (return homeDir)
+                return relpath
         }
 
 setRangeVisible :: Monad m => (Day,Day) -> CalendarT m ()

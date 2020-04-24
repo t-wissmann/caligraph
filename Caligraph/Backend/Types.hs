@@ -101,7 +101,8 @@ type ConfigGetter a = String -> Maybe a
 
 data ConfigRead = ConfigRead
   { configString :: ConfigGetter String
-  -- , configFilePath :: String -> Maybe FilePath
+  , configFilePath :: String -> Maybe FilePath
+  -- ^ returns an absolute filepath
   }
 
 type WakeUpLoop event = (event -> IO ()) -> IO ()
