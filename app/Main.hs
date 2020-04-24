@@ -17,6 +17,7 @@ import System.Environment
 import System.Exit
 import Control.Monad.Trans.Except
 import System.FilePath.Posix (takeExtension, takeBaseName)
+import System.Environment.XDG.BaseDir
 
 import qualified Data.Map.Strict as Map
 import qualified Data.HashMap.Strict as HMap
@@ -29,7 +30,7 @@ import Data.Maybe (isJust)
 data CliOpts = CliOpts
   { calendarfFile :: FilePath
   -- ^ filepath of a particular calendar to open
-  , calendarsIni :: Maybe FilePath
+  , calendarsIni :: FilePath
   -- ^ filepath of the calendars.ini file
   }
 
@@ -42,6 +43,11 @@ mainOld = do
                  print e
     Right r -> print r
 
+optparseInfo :: ParserInfo CliOpts
+optparseInfo = info (optparse <**> helper)
+      ( fullDesc
+      <> progDesc "Caligraph - calendar interactive and graphical")
+
 optparse :: Parser CliOpts
 optparse = CliOpts
   <$> strOption
@@ -50,16 +56,21 @@ optparse = CliOpts
     <> short 'f'
     <> value ""
     <> help "Calendar file to open (instead of configured calendars)" )
-  <*> pure Nothing -- to be implemented
+  <*> strOption
+    ( long "calendars"
+    <> metavar "CALENDARSINI"
+    <> value ""
+    <> help "Path to the calendars.ini configuration file"
+    <> showDefaultWith (const "~/.config/caligraph/calendars.ini")
+    )
+
+getCalendarsIniPath :: IO FilePath
+getCalendarsIniPath = getUserConfigFile "caligraph" "calendars.ini"
 
 main :: IO ()
 main = do
-  res <- execParser opts
+  res <- execParser optparseInfo
   mainConfigurable res
-  where
-    opts = info (optparse <**> helper)
-      ( fullDesc
-      <> progDesc "Caligraph - calendar interactive and graphical")
 
 mainConfigurable :: CliOpts -> IO ()
 mainConfigurable params = do
@@ -71,7 +82,11 @@ mainConfigurable params = do
   defaultBinds <- CliM.loadKeyConfig Cfg.defaultKeys
   -- load calendar config
   cals <- case calendarfFile params of
-          "" -> runExceptT (Cfg.loadCalendars CC.fromConfig (calendarsIni params))
+          "" -> do
+            calendars_ini <- if calendarsIni params /= ""
+                             then return (calendarsIni params)
+                             else getCalendarsIniPath
+            runExceptT (Cfg.loadCalendars CC.fromConfig calendars_ini)
                 >>= rightOrDie
           path -> do
             c <- runExceptT (filepath2calendar path) >>= rightOrDie

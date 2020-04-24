@@ -1,0 +1,15 @@
+# Macros for the birthdays we define next
+FSET gebc(y) iif(($Ty-y) > 0, $Ty-y + ". ", "") + "Birthday of "
+FSET fromyear(yr) "FROM 1 Jan " + max(yr, 1990)
+
+# Example usage of birthdays. I recommend generating these
+# lines from another source (addressbook) instead of writing them
+# manually
+
+REM 19 Jul [fromyear(1947)] MSG %"[gebc(1947)] Brian%" (%b)
+REM  5 Sep [fromyear(1946)] MSG %"[gebc(1946)] Freddie%" (%b)
+REM 26 Jul [fromyear(1949)] MSG %"[gebc(1949)] Roger%" (%b)
+REM 19 Aug [fromyear(1951)] MSG %"[gebc(1951)] John%" (%b)
+REM 21 Apr [fromyear(1926)] MSG %"[gebc(1926)] Elizabeth%" (%b)
+REM 14 Nov [fromyear(1948)] MSG %"[gebc(1948)] Charles%" (%b)
+REM 21 Jun [fromyear(1982)] MSG %"[gebc(1982)] William%" (%b)

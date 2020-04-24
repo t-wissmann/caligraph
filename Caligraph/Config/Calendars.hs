@@ -9,7 +9,6 @@ import Data.Text
 import Data.Text.IO as T
 import Data.Ini
 import Control.Monad.IO.Class (liftIO)
-import System.Environment.XDG.BaseDir
 import Control.Monad.Trans.Except
 import Control.Monad
 
@@ -30,14 +29,11 @@ type RawCalList = [(Text, CalendarConfig)]
 
 -- | load the calendars.ini file
 loadConfig
-    :: Maybe FilePath
-    -- ^ the filepath, defaulting to ~/.config/caligraph/calendars.ini
+    :: FilePath
+    -- ^ the path to the calendars.ini file
     -> ExceptT String IO RawCalList
     -- ^ the loaded calendar list
-loadConfig maybe_calendars_ini = do
-    path <- case maybe_calendars_ini of
-        Just fp -> return fp
-        Nothing -> liftIO $ getUserConfigFile "caligraph" "calendars.ini"
+loadConfig path = do
     src <- liftIO $ T.readFile path
     ini <- except $ parseIni src
     mapM (parseSection path) $ M.toList $ unIni ini
@@ -49,11 +45,11 @@ loadConfig maybe_calendars_ini = do
 loadCalendars
     :: (CalendarConfig -> ExceptT String IO a)
     -- ^ initialization of calendars, hidden as the type 'a'
-    -> Maybe FilePath
-    -- ^ a possibly alternate filepath of the calendars.ini
+    -> FilePath
+    -- ^ the filepath to the calendars.ini file
     -> ExceptT String IO [(Text, a)]
-loadCalendars fromConfig maybe_calendars_ini = do
-  raw_calendars <- loadConfig maybe_calendars_ini
+loadCalendars fromConfig calendars_ini = do
+  raw_calendars <- loadConfig calendars_ini
   forM raw_calendars (\(t,c) -> do
     c' <- fromConfig c
     return (t,c'))
