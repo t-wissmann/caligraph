@@ -45,7 +45,7 @@ data Event =
 
 parseConfig :: CB.ConfigRead -> Either String (St, CB.WakeUpLoop Event)
 parseConfig cfg = do
-  path <- mandatory CB.configString "path"
+  path <- mandatory CB.configFilePath "path"
   let st = St path PS.empty Nothing True
   return (st, wakeUpLoop st)
   where
@@ -53,8 +53,7 @@ parseConfig cfg = do
 
 wakeUpLoop :: St -> CB.WakeUpLoop Event
 wakeUpLoop st reportEvent = do
-    filepath <- liftIO $ CU.expandTilde (st^.path)
-    CU.watchFile filepath $ \exists ->
+    CU.watchFile (st^.path) $ \exists ->
       reportEvent $ FileChanged exists
 
 cachedIncarnations :: St -> (Day,Day) -> CB.Incarnations'
@@ -92,8 +91,7 @@ reloadFile :: CB.BackendM St Event ()
 reloadFile = do
   fp <- use path
   CB.callback ("Loading " ++ fp) $ fmap CalendarLoaded $ do
-    fullpath <- CU.expandTilde fp
-    input <- BS.readFile fullpath
+    input <- BS.readFile fp
     return $ Right ((), []) -- fp input
   where mapLeft f = either (Left . f) Right
 

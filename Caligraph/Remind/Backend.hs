@@ -156,15 +156,14 @@ partialDateLifeTime pdate =
 
 parseConfig :: CB.ConfigRead -> Either String Config
 parseConfig cfg =
-    CB.mandatory cfg CB.configString "path"
+    CB.mandatory cfg CB.configFilePath "path"
 
 load :: Config -> IO [CB.Item ItemID]
 load path = do
-  path' <- expandTilde path
-  reminders <- parseFile path'
+  reminders <- parseFile path
   return
     $ map (uncurry algorithm)
-    $ map (\(i,r) -> ((path',i),r))
+    $ map (\(i,r) -> ((path,i),r))
     $ mapMaybe isRem
     $ rights reminders
   where
@@ -215,8 +214,7 @@ handleEvent (CB.Response (FileContent cnt)) = do
 handleEvent (CB.AddReminder pr) = do
     config <- gets stConfig
     CB.callback ("Adding reminder and reloading " ++ config) $ do
-        path' <- expandTilde config
-        appendFile path' $ reminderTemplate pr
+        appendFile config $ reminderTemplate pr
         fmap FileContent $ load config
 
 wakeUpLoop :: CB.WakeUpLoop Event

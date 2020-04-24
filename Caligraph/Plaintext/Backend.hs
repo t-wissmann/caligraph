@@ -59,7 +59,7 @@ data Event =
 
 parseConfig :: CB.ConfigRead -> Either String (St, CB.WakeUpLoop Event)
 parseConfig cfg = do
-  path <- mandatory CB.configString "path"
+  path <- mandatory CB.configFilePath "path"
   let st = St path PS.empty Nothing True
   return (st, wakeUpLoop st)
   where
@@ -67,8 +67,7 @@ parseConfig cfg = do
 
 wakeUpLoop :: St -> CB.WakeUpLoop Event
 wakeUpLoop st reportEvent = do
-    filepath <- liftIO $ CU.expandTilde (st^.path)
-    CU.watchFile filepath $ \exists ->
+    CU.watchFile (st^.path) $ \exists ->
       reportEvent $ FileChanged exists
 
 cachedIncarnations :: St -> (Day,Day) -> CB.Incarnations'
@@ -80,9 +79,8 @@ cachedIncarnations st (from,to) =
 handleEvent :: CB.Event Event -> CB.BackendM St Event ()
 handleEvent (CB.SetRangeVisible (from,to)) = return ()
 handleEvent (CB.AddReminder pr) = do
-  tildepath <- use path
-  CB.callback ("Adding reminder to " ++ tildepath) $ do
-    fullpath <- CU.expandTilde tildepath
+  fullpath <- use path
+  CB.callback ("Adding reminder to " ++ fullpath) $ do
     let endTime = pure timePlus <*> (CB.prTime pr) <*> (CB.prDuration pr)
     appendFile fullpath $ concat
       [ show $ CB.prDay pr
@@ -134,10 +132,9 @@ reloadFile :: CB.BackendM St Event ()
 reloadFile = do
   fp <- use path
   CB.callback ("Loading " ++ fp) $ fmap CalendarLoaded $ do
-    fullpath <- CU.expandTilde fp
-    input <- readFile fullpath
+    input <- readFile fp
     return $ mapLeft show
-           $ parse (pure (Calendar fullpath) <*> calendarParser) fp input
+           $ parse (pure (Calendar fp) <*> calendarParser) fp input
   where mapLeft f = either (Left . f) Right
 
 backend :: CB.Backend St Event

@@ -8,7 +8,7 @@ import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
 import qualified Caligraph.Utils as CU
 import Caligraph.Remind.Types (month_names)
-import Caligraph.Utils (expandTilde,editFileExternally)
+import Caligraph.Utils (editFileExternally)
 
 import Control.Monad.State
 import Control.Monad.Writer (tell)
@@ -119,13 +119,12 @@ cachedIncarnations st (from,to) =
 
 wakeUpLoop :: St -> CB.WakeUpLoop Event
 wakeUpLoop st reportEvent = do
-    filepath <- liftIO $ expandTilde (st^.path)
-    CU.watchFile filepath (\exists -> reportEvent $ FileSystem exists filepath)
+    CU.watchFile (st^.path) (\exists -> reportEvent $ FileSystem exists (st^.path))
 
 parseConfig :: CB.ConfigRead -> Either String (St, CB.WakeUpLoop Event)
 parseConfig cfg = do
-    path <- mandatory CB.configString "path"
-    path_nr <- optional CB.configString "path_append" path
+    path <- mandatory CB.configFilePath "path"
+    path_nr <- optional CB.configFilePath "path_append" path
     let state = St path path_nr M.empty M.empty PS.empty
     return (state, wakeUpLoop state)
     where
@@ -133,12 +132,11 @@ parseConfig cfg = do
       optional = CB.optional cfg
 
 requestYear :: FilePath -> Integer -> IO Event
-requestYear tilde_path (y) =
+requestYear filepath (y) =
   if y < 1990 || y > 2075 then
     let msg = "remind only supports years from 1990 to 2075" in
     return $ YearData y [] (ExitFailure 1, msg)
   else do
-    filepath <- liftIO $ expandTilde tilde_path
     let rem = "remind"
     -- every year covers at most 54 weeks: 52 weeks entirely in the year,
     -- one week with the year before, and one week with the next year
@@ -159,9 +157,8 @@ handleEvent (CB.SetRangeVisible days) = do
       cacheMisses %= M.insert y False
 
 handleEvent (CB.AddReminder pr) = do
-  tilde_path <- use pathNewReminders
-  CB.callback ("Adding reminder to " ++ tilde_path) $ do
-      path' <- expandTilde tilde_path
+  path' <- use pathNewReminders
+  CB.callback ("Adding reminder to " ++ path') $ do
       appendFile path' $ reminderTemplate pr
       -- nothing to do, because the file watcher will flush the cache
       return Nop
@@ -191,13 +188,13 @@ handleEvent (CB.Response (YearData y days (exitCode,stderr))) = do
 
 requestMissingYears :: CB.BackendM St Event ()
 requestMissingYears = do
-  tilde_path <- use path
+  path' <- use path
   cm <- use cacheMisses
   cm' <- flip M.traverseWithKey cm (\y v -> do
     -- if v is not True, then we don't have a request for it yet
     unless v $
         CB.callback ("Requesting year " ++ show y) $
-            requestYear tilde_path y
+            requestYear path' y
     -- we set the value of this year to True
     return True)
   cacheMisses .= cm'
