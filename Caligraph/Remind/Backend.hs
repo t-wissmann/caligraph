@@ -156,9 +156,7 @@ partialDateLifeTime pdate =
 
 parseConfig :: CB.ConfigRead -> Either String Config
 parseConfig cfg =
-    case (CB.configString cfg "path") of
-        Just path -> return path
-        Nothing -> Left "Mandatory setting 'path' missing"
+    CB.mandatory cfg CB.configString "path"
 
 load :: Config -> IO [CB.Item ItemID]
 load path = do
