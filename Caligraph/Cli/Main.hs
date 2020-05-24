@@ -536,7 +536,6 @@ myHandleEvent s (AppEvent ev) =
       case ev of
         CalendarIO idx -> do
             forCalendar idx (CC.receiveResult >> CC.fileQuery)
-            c <- use (calendar_idx idx)
             s'' <- get
             dayGrid %= (DayGrid.resizeDays $ day2widget s'')
         CalendarWakeUp idx -> do
