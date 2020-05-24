@@ -10,6 +10,7 @@ import qualified Caligraph.Config.Main as Cfg
 import qualified Caligraph.Config.Defaults as Cfg
 import qualified Caligraph.Config.Calendars as Cfg
 import qualified Caligraph.Rules as Rules
+import qualified Caligraph.Headless as Headless
 
 import Data.Either
 import Control.Monad
@@ -32,7 +33,11 @@ data CliOpts = CliOpts
   -- ^ filepath of a particular calendar to open
   , calendarsIni :: FilePath
   -- ^ filepath of the calendars.ini file
+  , coCommand :: MainCommand
   }
+
+data MainCommand = McUi | McPrint
+
 
 mainOld :: IO ()
 mainOld = do
@@ -63,6 +68,11 @@ optparse = CliOpts
     <> help "Path to the calendars.ini configuration file"
     <> showDefaultWith (const "~/.config/caligraph/calendars.ini")
     )
+  <*> (subparser
+    ( command "ui" (info (pure McUi) (progDesc "interactive mode"))
+    <> command "print" (info (pure McPrint) (progDesc "print calendar to stdout"))
+    )
+    <|> pure McUi)
 
 getCalendarsIniPath :: IO FilePath
 getCalendarsIniPath = getUserConfigFile "caligraph" "calendars.ini"
@@ -70,7 +80,9 @@ getCalendarsIniPath = getUserConfigFile "caligraph" "calendars.ini"
 main :: IO ()
 main = do
   res <- execParser optparseInfo
-  mainConfigurable res
+  case coCommand res of
+    McUi -> mainConfigurable res
+    McPrint -> mainScript res
 
 mainConfigurable :: CliOpts -> IO ()
 mainConfigurable params = do
@@ -81,22 +93,35 @@ mainConfigurable params = do
   customBinds <- Cfg.keyConfigUserPath >>= Cfg.getSource >>= CliM.loadKeyConfig
   defaultBinds <- CliM.loadKeyConfig Cfg.defaultKeys
   -- load calendar config
-  cals <- case calendarfFile params of
-          "" -> do
-            calendars_ini <- if calendarsIni params /= ""
-                             then return (calendarsIni params)
-                             else getCalendarsIniPath
-            runExceptT (Cfg.loadCalendars CC.fromConfig calendars_ini)
-                >>= rightOrDie
-          path -> do
-            c <- runExceptT (filepath2calendar path) >>= rightOrDie
-            return [c]
+  cals <- loadCalendars params
   -- load rules
   rules <- runExceptT Rules.loadRules >>= rightOrDie
   -- start main application
   CliM.mainFromConfig rules (Map.union customBinds defaultBinds) cals
-  where
-    rightOrDie = either die return
+
+rightOrDie = either die return
+
+mainScript :: CliOpts -> IO ()
+mainScript params = do
+  -- load main config
+  config <- Cfg.load >>= rightOrDie
+  Cfg.evaluateEnvironmentConfig (Cfg.environment config)
+  -- load calendar config
+  cals <- loadCalendars params
+  Headless.main cals
+
+loadCalendars :: CliOpts -> IO [(T.Text,CC.ConfiguredCalendar)]
+loadCalendars params =
+  case calendarfFile params of
+    "" -> do
+      calendars_ini <- if calendarsIni params /= ""
+                       then return (calendarsIni params)
+                       else getCalendarsIniPath
+      runExceptT (Cfg.loadCalendars CC.fromConfig calendars_ini)
+          >>= rightOrDie
+    path -> do
+      c <- runExceptT (filepath2calendar path) >>= rightOrDie
+      return [c]
 
 filepath2calendar :: FilePath -> ExceptT String IO (T.Text,CC.ConfiguredCalendar)
 filepath2calendar filepath = do

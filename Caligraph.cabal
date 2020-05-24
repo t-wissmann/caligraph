@@ -37,6 +37,7 @@ library
     Caligraph.RemindPipe.Backend
     Caligraph.Calendar
     Caligraph.LazyResult
+    Caligraph.Headless
     Caligraph.Cli.Main
     Caligraph.Cli.DayGrid
     Caligraph.Cli.DayWidget
