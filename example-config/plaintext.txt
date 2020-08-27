@@ -2,5 +2,5 @@
 # the file format is mainly designed for testing purposes
 # and for providing a minimal backend implementation
 
-2020-05-10 Important Day
-2020-05-09 10:15-20 A timed reminder
+2020-09-10 Important Day
+2020-09-09 10:15-20 A timed reminder

@@ -1,5 +1,5 @@
 # Macros for the birthdays we define next
-FSET gebc(y) iif(($Ty-y) > 0, $Ty-y + ". ", "") + "Birthday of "
+FSET gebc(y) iif(($Ty-y) > 0, $Ty-y + ". ", "") + "Birthday of"
 FSET fromyear(yr) "FROM 1 Jan " + max(yr, 1990)
 
 # Example usage of birthdays. I recommend generating these
