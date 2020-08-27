@@ -24,3 +24,6 @@ need wrapper libraries for libtinfo from the aur:
 
 https://github.com/commercialhaskell/stack/issues/3448#issuecomment-332440389
 
+## Screenshot
+
+![caligraph main view](https://user-images.githubusercontent.com/9048813/91486899-32f31880-e8ad-11ea-8650-e54b3cfddbc9.png)
