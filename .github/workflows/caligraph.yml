@@ -1,0 +1,18 @@
+on: push
+
+jobs:
+  build:
+    name: Build and test with stack
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Run stack
+        uses: haskell/actions/setup@v1
+        with:
+          enable-stack: true
+          stack-version: 'latest'
+      - name: Run tests
+        run: stack test
