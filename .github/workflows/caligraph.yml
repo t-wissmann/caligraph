@@ -9,7 +9,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - uses: haskell/actions/setup@v1
+      - uses: haskell/actions/setup@master
         with:
           ghc-version: '8.8'
           enable-stack: true
