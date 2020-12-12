@@ -9,9 +9,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Run stack
-        uses: haskell/actions/setup@v1
+      - uses: haskell/actions/setup@v1
         with:
+          ghc-version: '8.8'
           enable-stack: true
           stack-version: 'latest'
       - name: Run tests
