@@ -37,11 +37,13 @@ jobs:
       run: |
         stack test --system-ghc
 
+    - name: Install
+      run: |
+        stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --copy-bins
+        mkdir caligraph-bin
+        cp -r `stack path --local-bin`/* caligraph-bin/
+
     - uses: actions/upload-artifact@v2
       with:
-        name: Install
+        name: Save binaries
         path: caligraph-bin
-        run: |
-          stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --copy-bins
-          mkdir caligraph-bin
-          cp -r `stack path --local-bin`/* caligraph-bin/
