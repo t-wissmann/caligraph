@@ -4,11 +4,13 @@ module Caligraph.IcsFile.Types where
 type Param = (String, String, [String])
 type ContentLine = (String, [Param], String)
 
-data Tree = Tree String [TreeEntry]
-data TreeEntry
-  = TeAttribute ContentLine
+data Tree annotation = Tree annotation String [TreeEntry annotation]
+    deriving (Eq, Ord, Show)
+data TreeEntry annotation
+  = TeAttribute annotation ContentLine
   -- ^ an attribute
-  | TeSubtree Tree
+  | TeSubtree annotation (Tree annotation)
   -- ^ another tree
+  deriving (Eq, Ord, Show)
 
 

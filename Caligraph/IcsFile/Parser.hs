@@ -6,6 +6,8 @@ import Text.ParserCombinators.Parsec hiding (parse)
 import Text.ParserCombinators.Parsec.Token
 import qualified Text.ParserCombinators.Parsec as P
 
+import Control.Arrow (second)
+import Control.Monad (forM)
 import Data.Char
 import Data.Either
 
@@ -74,14 +76,21 @@ unfoldLines
 unfoldLines fp =
     P.parse parseLines fp . filter ((/=) '\r')
 
+-- | group all BEGIN...END-Blocks to trees
+buildTree :: [TreeEntry annotation] -> Either ParseError [TreeEntry annotation]
+buildTree = Right -- TODO
+
 parse
   :: String
   -- ^ the filepath/title for error messages
   -> String
   -- ^ the file's content
-  -> ([ParseError], [(SourcePos,ContentLine)])
-parse fp filecontent = partitionEithers $
-  case (unfoldLines fp filecontent) of
-    Left parseError -> [Left parseError]
-    Right lines ->
-        map (\(sp,str) -> (,) sp <$> P.parse parseContentLine (fp ++ show sp) str) lines
+  -> Either ParseError [TreeEntry SourcePos]
+parse fp filecontent = do
+  -- unfold wrapped lines
+  unfolded <- unfoldLines fp filecontent
+  -- tokenize each of these lines
+  contlines <- forM unfolded $ \(pos, line) -> do
+                  TeAttribute pos <$> P.parse parseContentLine (fp ++ show pos) line
+  -- turn them into a tree
+  buildTree contlines
