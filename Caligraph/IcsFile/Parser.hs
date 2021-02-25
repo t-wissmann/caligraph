@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification, RankNTypes #-}
 module Caligraph.IcsFile.Parser where
 
 import Caligraph.IcsFile.Types
@@ -6,10 +7,12 @@ import Text.ParserCombinators.Parsec hiding (parse)
 import Text.ParserCombinators.Parsec.Token
 import qualified Text.ParserCombinators.Parsec as P
 
+import Data.Time.Clock (secondsToDiffTime, UTCTime(..))
 import Control.Arrow (second)
 import Control.Monad (forM)
 import Data.Char
 import Data.Either
+import Data.Functor.Const
 import Control.Monad.Except
 import qualified Control.Monad.State as State
 
@@ -113,6 +116,59 @@ treeBuilder = do
         cl_with pred = token (show . snd) fst (\(_,line) ->
             let (s,_,_) = line in
             if pred (map toUpper s) then Just line else Nothing)
+
+encodedChar :: GenParser Char st Char
+encodedChar = do
+    noneOf "\\" <|> do
+        char '\\'
+        c <- anyToken
+        return $ case c of
+                    'N' -> '\n'
+                    'n' -> '\n'
+                    c   -> c
+
+-- | parse the entire input into a string
+encodedString :: GenParser Char st String
+encodedString = do
+    s <- many encodedChar
+    eof
+    return s
+
+tryRead :: Read a => String -> GenParser Char st a
+tryRead str =
+    case reads str of
+    ((v, suffix):_) ->
+        if all isSpace suffix
+        then return v
+        else fail $ "Could not parse: " ++ suffix
+    [] -> fail $ "Could not parse: " ++ str
+
+
+data ConvertTo a b = ConvertTo { convertTo :: (b -> a) }
+
+typedValueParser :: (IcsType (ConvertTo typ)) -> GenParser Char st typ
+typedValueParser (ItString ret) = convertTo ret <$> encodedString
+typedValueParser (ItBool ret) = convertTo ret <$> do
+    s <- many anyToken
+    case map toUpper s of
+        "TRUE" -> return True
+        "FALSE" -> return False
+        _ -> fail $ "Not a boolean value: " ++ s
+typedValueParser (ItDateTime ret) = convertTo ret <$> do
+    y <- count 4 digit
+    m <- count 2 digit
+    d <- count 2 digit
+    day <- tryRead (y ++ "-" ++ m ++ "-" ++ d)
+    char 'T'
+    hh <- count 2 digit >>= tryRead
+    mm <- count 2 digit >>= tryRead
+    ss <- count 2 digit >>= tryRead
+    let time = (((hh * 60) + mm) * 60 + ss) :: Integer
+    eof
+    return $ UTCTime day (secondsToDiffTime time)
+
+decodeValue :: (forall f. f t -> IcsType f) -> EncodedValue -> Either ParseError t
+decodeValue icstype src = P.parse (typedValueParser $ icstype $ ConvertTo id) src src
 
 parse
   :: String
