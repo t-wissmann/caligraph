@@ -10,6 +10,8 @@ import Control.Arrow (second)
 import Control.Monad (forM)
 import Data.Char
 import Data.Either
+import Control.Monad.Except
+import qualified Control.Monad.State as State
 
 type IcsLine = (Int,String)
 
@@ -33,17 +35,19 @@ parseName = many1 $ oneOf $ ['0'..'9'] ++ "-" ++ ['a'..'z'] ++ ['A'..'Z']
 -- param         = param-name "=" param-value *("," param-value)
 parseParam :: GenParser Char st Param
 parseParam = (,,) <$> parseName
-                  <*> (char '=' >> parseValue)
-                  <*> many (char ',' >> parseValue)
+                  <*> (char '=' >> parseParamValue)
+                  <*> many (char ',' >> parseParamValue)
 
 -- | parse a param-value
 --
 -- Currently, we ignore case-insensitivity. The RFC5545 in sec 3.2 says:
 -- "Property parameter values that are not in quoted-strings are
 -- case-insensitive."
-parseValue :: GenParser Char st String
-parseValue = (char '"' >> many qsafeChar <* char '"')
-    <|> many safeChar
+-- https://tools.ietf.org/html/rfc5545#section-3.2
+parseParamValue :: GenParser Char st String
+parseParamValue =
+    (char '"' >> many qsafeChar <* char '"') -- quoted-string
+    <|> many safeChar -- paramtext
     where
         -- QSAFE-CHAR    = WSP / %x21 / %x23-7E / NON-US-ASCII
         -- ; Any character except CONTROL and DQUOTE
@@ -59,6 +63,10 @@ parseValue = (char '"' >> many qsafeChar <* char '"')
         control :: [Char]
         control = map chr $ [0x00..0x08] ++ [0x0A..0x1F] ++ [0x7F]
 
+
+-- | a value after the last syntactical ':'
+parseValue :: GenParser Char st String
+parseValue = many anyToken -- VALUE-CHAR: "Any textual character"
 
 -- | parse content lines in the sense of section 3.1 of RFC5545
 parseContentLine :: GenParser Char st ContentLine
@@ -76,21 +84,55 @@ unfoldLines
 unfoldLines fp =
     P.parse parseLines fp . filter ((/=) '\r')
 
--- | group all BEGIN...END-Blocks to trees
-buildTree :: [TreeEntry annotation] -> Either ParseError [TreeEntry annotation]
-buildTree = Right -- TODO
+-- | group by begin..end-blocks
+treeBuilder :: GenParser (SourcePos,ContentLine) st (Tree SourcePos)
+treeBuilder = do
+    parseTree
+    where
+        parseTree :: GenParser (SourcePos,ContentLine) st (Tree SourcePos)
+        parseTree = do
+            pos <- getPosition
+            (_,param, groupname) <- cl_with ((==) "BEGIN")
+            entries <- many parseTreeEntry
+            (_,param', groupname') <- cl_with  ((==) "END")
+            return $ Tree pos groupname entries
+
+        parseTreeEntry :: GenParser (SourcePos,ContentLine) st (TreeEntry SourcePos)
+        parseTreeEntry =
+            try (TeSubtree <$> parseTree)
+            <|>
+            do
+                pos <- getPosition
+                cl <- cl_with ((/=) "END")
+                return $ TeAttribute pos cl
+
+        contentline :: GenParser (SourcePos,ContentLine) st ContentLine
+        contentline = token (show . snd) fst (Just . snd)
+
+        cl_with :: (String -> Bool) -> GenParser (SourcePos,ContentLine) st ContentLine
+        cl_with pred = token (show . snd) fst (\(_,line) ->
+            let (s,_,_) = line in
+            if pred (map toUpper s) then Just line else Nothing)
 
 parse
   :: String
   -- ^ the filepath/title for error messages
   -> String
   -- ^ the file's content
-  -> Either ParseError [TreeEntry SourcePos]
+  -> Either ParseError (Tree SourcePos)
 parse fp filecontent = do
   -- unfold wrapped lines
   unfolded <- unfoldLines fp filecontent
   -- tokenize each of these lines
   contlines <- forM unfolded $ \(pos, line) -> do
-                  TeAttribute pos <$> P.parse parseContentLine (fp ++ show pos) line
+                  (,) pos <$> P.parse parseContentLine (fp ++ show pos) line
   -- turn them into a tree
-  buildTree contlines
+  P.parse treeBuilder fp contlines
+
+parseFile
+  :: String
+  -- ^ the filepath
+  -> IO (Either ParseError (Tree SourcePos))
+parseFile fp = do
+  content <- readFile fp
+  return $ parse fp content

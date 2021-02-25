@@ -31,6 +31,7 @@ library
     Caligraph.IcsFile.Backend
     Caligraph.IcsFile.Types
     Caligraph.IcsFile.Parser
+    Caligraph.IcsFile.Printer
     Caligraph.Plaintext.Backend
     Caligraph.RemindPipe.Parser
     Caligraph.RemindPipe.Types
