@@ -1,0 +1,12 @@
+
+
+REM 1 MSG First of a month
+REM Fri AT 16:00 MSG Beer
+REM 1 -2 MSG Salary?
+REM 1 Mon AT 10:00 DURATION 2:00 MSG Lecture
+REM 1 Sun AT 14:00 DURATION 1:00 MSG Visiting the Parents
+REM 10 Wed AT 23:00 DURATION 2:00 MSG Dancing at the Star-Club
+REM 10 MSG Tooka
+Rem 2 AT 8:00 DURATION 2:30 MSG First appointment
+Rem 2 AT 10:00 DURATION 2:00 MSG Second one
+Rem 2 Wed AT 12:00 DURATION 2:00 MSG Lunch break
