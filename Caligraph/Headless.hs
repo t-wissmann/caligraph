@@ -9,6 +9,7 @@ import qualified Caligraph.Calendar as CC
 import Caligraph.Cli.DayGrid (getToday)
 
 import Data.Array
+import Data.Maybe
 import qualified Data.Map.Strict as Map
 import Data.Time.Calendar (Day)
 import Data.Text (Text)
@@ -23,6 +24,15 @@ import Control.Monad.State
 import Control.Monad.Writer.Lazy
 import System.Exit (ExitCode)
 import Control.Concurrent.Chan
+import System.IO (hPutStrLn, stderr)
+
+data HeadlessOptions = HeadlessOptions
+    -- { hoFirstDay :: Maybe Day
+    -- , hoLastDay :: Maybe Day
+    -- }
+    { hoFirstDay :: Maybe Day
+    , hoLastDay :: Maybe Day
+    }
 
 data HeadlessEvent =
   CalendarProg Int (CC.CalendarT IO ())
@@ -42,7 +52,7 @@ forCalendar idx prog = do
   ((a, c'),logs) <- lift $ runWriterT (runStateT prog c)
   -- TODO: save c' back and print logs
   calendars %= map (updateCal c') . zip [0..]
-  liftIO $ forM_ logs (\l -> putStrLn $ (T.unpack name) ++ ": " ++ l)
+  liftIO $ forM_ logs (\l -> hPutStrLn stderr $ (T.unpack name) ++ ": " ++ l)
   return a
   where updateCal c' (i,(n,c)) =
           if i == idx then (n,c') else (n,c)
@@ -57,7 +67,7 @@ syncCalendars = do
   cals <- gets _calendars
   openQueries <- fmap sum $ forEachCalendar (CC.openQueryCount <$> get)
   when (openQueries > 0) $ do
-    -- liftIO $ putStrLn "waiting for response..."
+    -- liftIO $ hPutStrLn stderr "waiting for response..."
     forEachCalendar CC.fileQuery
     chan <- gets _eventChan
     CalendarProg idx prog <- liftIO $ readChan chan
@@ -74,21 +84,24 @@ initState cals = do
     return (name, c')
   return $ HeadlessState cals' chan
 
-main :: [(T.Text,CC.ConfiguredCalendar)] -> IO ()
-main cals = do
+main :: [(T.Text,CC.ConfiguredCalendar)] -> HeadlessOptions -> IO ()
+main cals opts = do
   state <- initState cals
-  ((),state') <- runStateT showToday state
+  ((),state') <- runStateT (printReminders opts) state
   return ()
 
 
-showToday :: HeadlessT IO ()
-showToday = do
-  day <- liftIO getToday
-  forEachCalendar (CC.setRangeVisible (day,day))
+printReminders :: HeadlessOptions -> HeadlessT IO ()
+printReminders opts = do
+  today <- liftIO getToday
+  let firstDay = fromMaybe today $ hoFirstDay opts
+  let lastDay = fromMaybe today $ hoLastDay opts
+  forEachCalendar (CC.setRangeVisible (firstDay,lastDay))
   syncCalendars
-  incs <- fmap (map $ fmap $ flip CC.cachedIncarnations (day,day)) $ gets _calendars
+  incs <- fmap (map $ fmap $ flip CC.cachedIncarnations (firstDay,lastDay)) $ gets _calendars
   liftIO $ forM_ (incs :: [(Text,CB.Incarnations')]) $ \(name,arr) -> do
-    let incsOfTheDay = map (fmap (const ())) $ (arr ! day)
-    putStrLn (T.unpack name ++ ":")
-    forM incsOfTheDay (putStrLn . (++) "  " . show)
-    return ()
+    forM_ [firstDay..lastDay] $ \day -> do
+        let incsOfTheDay = map (fmap (const ())) $ (arr ! day)
+        -- putStrLn (T.unpack name ++ ":")
+        forM incsOfTheDay (putStrLn . (++) "  " . show)
+        return ()

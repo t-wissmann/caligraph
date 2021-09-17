@@ -36,7 +36,7 @@ data CliOpts = CliOpts
   , coCommand :: MainCommand
   }
 
-data MainCommand = McUi | McPrint
+data MainCommand = McUi | McPrint Headless.HeadlessOptions
 
 
 mainOld :: IO ()
@@ -68,11 +68,26 @@ optparse = CliOpts
     <> help "Path to the calendars.ini configuration file"
     <> showDefaultWith (const "~/.config/caligraph/calendars.ini")
     )
-  <*> (subparser
+  <*> (hsubparser
     ( command "ui" (info (pure McUi) (progDesc "interactive mode"))
-    <> command "print" (info (pure McPrint) (progDesc "print calendar to stdout"))
+    <> command "print" (info (McPrint <$> printOptions) (progDesc "print calendar to stdout"))
     )
     <|> pure McUi)
+
+printOptions :: Parser Headless.HeadlessOptions
+printOptions = Headless.HeadlessOptions
+  <$> option (Just <$> auto)
+    ( long "from"
+    <> metavar "DAY"
+    <> value Nothing
+    <> help "First to day to include in the output (YYYY-MM-DD)"
+    )
+  <*> option (Just <$> auto)
+    ( long "to"
+    <> metavar "DAY"
+    <> value Nothing
+    <> help "Last to day to include in the output (YYYY-MM-DD)"
+    )
 
 getCalendarsIniPath :: IO FilePath
 getCalendarsIniPath = getUserConfigFile "caligraph" "calendars.ini"
@@ -82,7 +97,7 @@ main = do
   res <- execParser optparseInfo
   case coCommand res of
     McUi -> mainConfigurable res
-    McPrint -> mainScript res
+    McPrint opts -> mainScript res opts
 
 mainConfigurable :: CliOpts -> IO ()
 mainConfigurable params = do
@@ -101,14 +116,14 @@ mainConfigurable params = do
 
 rightOrDie = either die return
 
-mainScript :: CliOpts -> IO ()
-mainScript params = do
+mainScript :: CliOpts -> Headless.HeadlessOptions -> IO ()
+mainScript globalParams scriptParams = do
   -- load main config
   config <- Cfg.load >>= rightOrDie
   Cfg.evaluateEnvironmentConfig (Cfg.environment config)
   -- load calendar config
-  cals <- loadCalendars params
-  Headless.main cals
+  cals <- loadCalendars globalParams
+  Headless.main cals scriptParams
 
 loadCalendars :: CliOpts -> IO [(T.Text,CC.ConfiguredCalendar)]
 loadCalendars params =
