@@ -8,6 +8,7 @@ import Caligraph.Breakpoint
 import qualified Caligraph.Calendar as CC
 import Caligraph.Cli.DayGrid (getToday)
 
+import Data.Aeson
 import Data.Array
 import Data.Maybe
 import qualified Data.Map.Strict as Map
@@ -87,21 +88,48 @@ initState cals = do
 main :: [(T.Text,CC.ConfiguredCalendar)] -> HeadlessOptions -> IO ()
 main cals opts = do
   state <- initState cals
-  ((),state') <- runStateT (printReminders opts) state
+  -- extract all reminders and print each of them
+  ((),state') <- runStateT (extractReminders opts >>= (liftIO . printReminders)) state
   return ()
 
 
-printReminders :: HeadlessOptions -> HeadlessT IO ()
-printReminders opts = do
+extractReminders :: HeadlessOptions -> HeadlessT IO [FullReminder]
+extractReminders opts = do
   today <- liftIO getToday
   let firstDay = fromMaybe today $ hoFirstDay opts
   let lastDay = fromMaybe today $ hoLastDay opts
   forEachCalendar (CC.setRangeVisible (firstDay,lastDay))
   syncCalendars
   incs <- fmap (map $ fmap $ flip CC.cachedIncarnations (firstDay,lastDay)) $ gets _calendars
-  liftIO $ forM_ (incs :: [(Text,CB.Incarnations')]) $ \(name,arr) -> do
-    forM_ [firstDay..lastDay] $ \day -> do
-        let incsOfTheDay = map (fmap (const ())) $ (arr ! day)
-        -- putStrLn (T.unpack name ++ ":")
-        forM incsOfTheDay (putStrLn . (++) "  " . show)
-        return ()
+  return $ flip concatMap (incs :: [(Text,CB.Incarnations')])
+         $ \(name,arr) ->
+           map (FullReminder name)
+           -- remove the identifier in reminders:
+           $ map (fmap (const ()))
+           -- concat all days
+           $ concat
+           -- remove day
+           $ map snd
+           -- filter by days in above range
+           $ filter (\(d,i) -> d >= firstDay && d <= lastDay)
+           -- get all pairs of days and reminders on that days
+           $ assocs arr
+
+
+printReminders
+    :: [FullReminder]
+    -> IO ()
+printReminders = mapM_ $ \rem -> do
+    putStr $ T.unpack $ frCalendar rem
+    putStrLn $ show $ frMain rem
+
+
+data FullReminder = FullReminder
+    { frCalendar :: Text
+    , frMain :: CB.Incarnation ()
+    }
+
+
+
+
+
