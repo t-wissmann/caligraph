@@ -3,24 +3,28 @@
 module Caligraph.Headless where
 
 import Caligraph.Backend.Types as CB
+import Caligraph.Backend.Utils as CU
 import Caligraph.Cli.Types
 import Caligraph.Breakpoint
 import qualified Caligraph.Calendar as CC
 import Caligraph.Cli.DayGrid (getToday)
 
 import Data.Aeson
+import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Array
 import Data.Maybe
 import qualified Data.Map.Strict as Map
-import Data.Time.Calendar (Day)
+import Data.Time.Calendar (Day,addDays)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
 import Data.Time.LocalTime (TimeZone)
+import qualified Data.ByteString.Lazy.Char8 as B
+
 
 import Lens.Micro
 import Lens.Micro.TH
-import Lens.Micro.Mtl
+import Lens.Micro.Mtl ((%=))
 import Control.Monad.State
 import Control.Monad.Writer.Lazy
 import System.Exit (ExitCode)
@@ -119,16 +123,38 @@ extractReminders opts = do
 printReminders
     :: [FullReminder]
     -> IO ()
-printReminders = mapM_ $ \rem -> do
-    putStr $ T.unpack $ frCalendar rem
-    putStrLn $ show $ frMain rem
-
+printReminders = B.putStrLn . encodePretty
 
 data FullReminder = FullReminder
     { frCalendar :: Text
     , frMain :: CB.Incarnation ()
     }
 
+instance ToJSON FullReminder where
+    toJSON rem =
+        let r = frMain rem in
+        object $ map (\(k,v) -> T.pack k .= v) $
+        [ (,) "calendar" $ frCalendar rem
+        , (,) "title"    $ T.pack $ CB.title r
+        , (,) "day"      $ T.pack $ show $ CB.day r
+        , (,) "time"     $ showTime $ CB.time r
+        , (,) "duration" $ showTime $ CB.duration r
+        , (,) "endtime"  $ showTime $ fst endTimeAndDay
+        , (,) "endday"   $ T.pack $ maybe "" show $ snd endTimeAndDay
+        ]
+        where
+          showTime :: Maybe (Int,Int) -> Text
+          showTime = T.pack . dropWhile ((==) ' ') . maybe "" (CU.showTime ':')
+          endTimeAndDay :: (Maybe (Int,Int), Maybe Day)
+          endTimeAndDay = pairmaps (fmap fst) (fmap snd) $ do -- in the maybe monad
+            let r = frMain rem
+            (h1,m1) <- CB.time r
+            (h2,m2) <- CB.duration r
+            let m_final = (m1 + m2) `mod` 60
+            let h_final = h1 + h2 + (m1 + m2) `div` 60
+            return ((h_final `mod` 24, m_final), (fromIntegral $ h_final `div` 24) `addDays` CB.day r)
+          pairmaps :: (a -> b) -> (a -> c) -> (a -> (b,c))
+          pairmaps f g a = (f a, g a)
 
 
 
