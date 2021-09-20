@@ -88,6 +88,12 @@ printOptions = Headless.HeadlessOptions
     <> value Nothing
     <> help "Last to day to include in the output (YYYY-MM-DD)"
     )
+  <*> option (maybeReader $ \s -> Just $ Just $ mkRegexWithOpts s False False)
+    ( long "title"
+    <> metavar "REGEX"
+    <> value Nothing
+    <> help "Regex to filter entries by their title"
+    )
 
 getCalendarsIniPath :: IO FilePath
 getCalendarsIniPath = getUserConfigFile "caligraph" "calendars.ini"

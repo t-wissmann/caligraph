@@ -20,6 +20,7 @@ import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
 import Data.Time.LocalTime (TimeZone)
 import qualified Data.ByteString.Lazy.Char8 as B
+import Text.Regex
 
 
 import Lens.Micro
@@ -37,6 +38,7 @@ data HeadlessOptions = HeadlessOptions
     -- }
     { hoFirstDay :: Maybe Day
     , hoLastDay :: Maybe Day
+    , hoTitleFilter :: Maybe Regex
     }
 
 data HeadlessEvent =
@@ -112,10 +114,15 @@ extractReminders opts = do
            $ map (fmap (const ()))
            -- concat all days
            $ concat
+           -- filter by title
+           $ (case (hoTitleFilter opts) of
+              Nothing -> id
+              Just reg -> map $ filter (isJust . matchRegex reg . CB.title)
+           )
            -- remove day
            $ map snd
            -- filter by days in above range
-           $ filter (\(d,i) -> d >= firstDay && d <= lastDay)
+           $ filter (\(d,_) -> d >= firstDay && d <= lastDay)
            -- get all pairs of days and reminders on that days
            $ assocs arr
 
