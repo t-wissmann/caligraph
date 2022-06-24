@@ -334,7 +334,7 @@ drawUI st =
           AMAppend ->
             "-- INSERT --"
           AMNormal ->
-            fromMaybe "" $ fmap snd $ listToMaybe (st^.messages)
+            takeWhile (/= '\n') $ fromMaybe "" $ fmap snd $ listToMaybe (st^.messages)
     showLocalTime (LocalTime day (TimeOfDay h m s)) =
         let MkFixed i = s in
         printf "%s %02d:%02d:%02d.%03d" (show day) h m (i `div` (resolution s)) ((i * 1000) `div` (resolution s) `mod` 1000)
