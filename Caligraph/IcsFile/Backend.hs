@@ -24,13 +24,15 @@ import Lens.Micro
 import Lens.Micro.Mtl
 import Lens.Micro.TH
 
-type IcsData = ()
+import qualified Caligraph.IcsFile.Types as Ics
+import qualified Caligraph.IcsFile.Parser as IcsParser
 
 data St = St
     { _path :: String -- a filepath with tilde not yet expanded
     , _idStore :: PS.PointerStore Int
     -- ^ store line numbers of calendar entries
-    , _calendar :: Maybe (IcsData)
+    , _calendar :: Maybe (Ics.Tree SourcePos)
+    -- , _events :: [Ics.CompiledEvent]
     , _bootup :: Bool
     -- ^ whether we are in the startup phase
     }
@@ -38,7 +40,7 @@ data St = St
 makeLenses ''St
 
 data Event =
-  CalendarLoaded (Either String (IcsData, [String]))
+  CalendarLoaded (Either String (Ics.Tree SourcePos))
   | SourceEdited
   | FileChanged Bool
   -- ^ when the file was modified, and whether it still exists
@@ -72,12 +74,12 @@ handleEvent (CB.AddReminder pr) = do
 
 handleEvent (CB.Response (CalendarLoaded cOrError)) = do
   case cOrError of
-    Right ((),warnings) -> do
+    Right icsTree -> do
       -- c' <- zoom idStore $ mapM PS.lookupOrInsert c
-      -- calendar .= Just c'
+      calendar .= Just icsTree
       tell [CB.BALog $ "Calendar loaded with "
-            ++ (show $ 1234) ++ " events"]
-      forM_ warnings (\w -> tell [CB.BAError w])
+            ++ (show $ length $ Ics.treeChildren icsTree) ++ " events"]
+      -- forM_ (warnings :: [String]) (\w -> tell [CB.BAError w])
       return ()
     Left error -> tell [CB.BAError error]
 handleEvent (CB.Response (SourceEdited)) = return ()
@@ -91,8 +93,8 @@ reloadFile :: CB.BackendM St Event ()
 reloadFile = do
   fp <- use path
   CB.callback ("Loading " ++ fp) $ fmap CalendarLoaded $ do
-    input <- BS.readFile fp
-    return $ Right ((), []) -- fp input
+    contentOrError <- IcsParser.parseFile fp
+    return $ mapLeft show contentOrError
   where mapLeft f = either (Left . f) Right
 
 backend :: CB.Backend St Event

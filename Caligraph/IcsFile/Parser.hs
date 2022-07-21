@@ -6,12 +6,14 @@ import Caligraph.IcsFile.Types
 import Text.ParserCombinators.Parsec hiding (parse)
 import Text.ParserCombinators.Parsec.Token
 import qualified Text.ParserCombinators.Parsec as P
+import qualified Data.HashMap.Strict as Map
 
 import Data.Time.Clock (secondsToDiffTime, UTCTime(..))
 import Control.Arrow (second)
 import Control.Monad (forM)
 import Data.Char
 import Data.Either
+import Data.Maybe (mapMaybe)
 import Data.Functor.Const
 import Control.Monad.Except
 import qualified Control.Monad.State as State
@@ -87,6 +89,19 @@ unfoldLines
 unfoldLines fp =
     P.parse parseLines fp . filter ((/=) '\r')
 
+refreshTreeEntryMap :: Tree annotation -> Tree annotation
+refreshTreeEntryMap tree =tree { treeEntryMap = newMap }
+    where
+        newMap :: Map.HashMap String ContentLine
+        newMap = Map.fromListWith (\first second -> first) $ mapMaybe treeEntry2Pair (treeChildren tree)
+
+        treeEntry2Pair :: TreeEntry a -> Maybe (String, ContentLine)
+        treeEntry2Pair (TeAttribute _ line) =
+            let (name, _, _) = line in Just (name, line)
+        treeEntry2Pair _ = Nothing
+
+
+
 -- | group by begin..end-blocks
 treeBuilder :: GenParser (SourcePos,ContentLine) st (Tree SourcePos)
 treeBuilder = do
@@ -98,7 +113,7 @@ treeBuilder = do
             (_,param, groupname) <- cl_with ((==) "BEGIN")
             entries <- many parseTreeEntry
             (_,param', groupname') <- cl_with  ((==) "END")
-            return $ Tree pos groupname entries
+            return $ refreshTreeEntryMap $ Tree pos (read groupname) entries Map.empty
 
         parseTreeEntry :: GenParser (SourcePos,ContentLine) st (TreeEntry SourcePos)
         parseTreeEntry =
@@ -112,6 +127,7 @@ treeBuilder = do
         contentline :: GenParser (SourcePos,ContentLine) st ContentLine
         contentline = token (show . snd) fst (Just . snd)
 
+        -- | content line with property
         cl_with :: (String -> Bool) -> GenParser (SourcePos,ContentLine) st ContentLine
         cl_with pred = token (show . snd) fst (\(_,line) ->
             let (s,_,_) = line in

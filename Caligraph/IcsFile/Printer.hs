@@ -11,14 +11,14 @@ prettyShowTree = concat . intersperse "\n" . treeLines
     treeEntryLines (TeSubtree tree) = treeLines tree
 
     treeLines :: Show annotation => Tree annotation -> [String]
-    treeLines (Tree a group entries) =
-        (["BEGIN:" ++ group ++ "   " ++ show a] :: [String])
+    treeLines tree =
+        (["BEGIN:" ++ show (treeType tree) ++ "   " ++ show (treeAnnotation tree)] :: [String])
         ++ ((do
-                entry <- entries
+                entry <- treeChildren tree
                 line <- (treeEntryLines entry :: [String])
                 return (' ' : line)
            ) :: [String])
-        ++ ["END:" ++ group]
+        ++ ["END:" ++ show (treeType tree)]
 
 prettyPrintTree :: Show annotation => Tree annotation -> IO ()
 prettyPrintTree tree = putStrLn $ prettyShowTree tree
