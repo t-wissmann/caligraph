@@ -170,6 +170,13 @@ typedValueParser (ItBool ret) = convertTo ret <$> do
         "TRUE" -> return True
         "FALSE" -> return False
         _ -> fail $ "Not a boolean value: " ++ s
+typedValueParser (ItDate ret) = convertTo ret <$> do
+    y <- count 4 digit
+    m <- count 2 digit
+    d <- count 2 digit
+    day <- tryRead (y ++ "-" ++ m ++ "-" ++ d)
+    eof
+    return day
 typedValueParser (ItDateTime ret) = convertTo ret <$> do
     y <- count 4 digit
     m <- count 2 digit
@@ -179,9 +186,8 @@ typedValueParser (ItDateTime ret) = convertTo ret <$> do
     hh <- count 2 digit >>= tryRead
     mm <- count 2 digit >>= tryRead
     ss <- count 2 digit >>= tryRead
-    let time = (((hh * 60) + mm) * 60 + ss) :: Integer
     eof
-    return $ UTCTime day (secondsToDiffTime time)
+    return $ (day, (hh, mm, ss))
 
 decodeValue :: (forall f. f t -> IcsType f) -> EncodedValue -> Either ParseError t
 decodeValue icstype src = P.parse (typedValueParser $ icstype $ ConvertTo id) src src
@@ -208,3 +214,17 @@ parseFile
 parseFile fp = do
   content <- readFile fp
   return $ parse fp content
+
+
+-- compileEvent :: Tree annotation -> Either String CompiledEvent
+-- compileEvent tree = CompiledEvent <$> startDate <*> summary
+--     where
+--         getField :: (forall f. f t -> IcsType f) -> String -> Either String t
+--         getField fieldtype name = do
+--             encodedValue <- maybeToRight ("Field \"" ++ name ++ "\" missing")
+--                             $ Map.lookup (treeEntryMap tree) name
+--             decodedValue <- mapLeft show $ decodeValue fieldtype
+--             return decodedValue
+--         summary = getField ItString "SUMMARY"
+--         startDate = fmap Right $ getField ItDate "DTSTART"
+

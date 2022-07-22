@@ -2,8 +2,7 @@
 {-# LANGUAGE ExistentialQuantification, RankNTypes #-}
 module Caligraph.IcsFile.Types where
 
-import Data.Time.Clock (UTCTime)
-
+import Data.Time.Calendar (Day)
 import qualified Data.HashMap.Strict as Map
 
 -- | a param is: name = value[, …]
@@ -38,17 +37,21 @@ data TreeEntry annotation
   -- ^ another tree
   deriving (Eq, Ord, Show, Functor)
 
+type Time = (Int,Int,Int)
+
 data CompiledEvent = CompiledEvent
-    { ceStart :: UTCTime
+    { ceStartDay :: Day
     , ceSummary :: String
     }
 
 data IcsType icstype
     = ItString (icstype String)
     | ItBool (icstype Bool)
-    | ItDateTime (icstype UTCTime)
+    | ItDateTime (icstype (Day,Time))
+    | ItDate (icstype Day)
 
 mapIcsType :: (forall a. f a -> (f' a)) -> IcsType f -> (IcsType f')
 mapIcsType f (ItString v) = ItString $ f v
 mapIcsType f (ItBool v) = ItBool $ f v
+mapIcsType f (ItDate v) = ItDate $ f v
 mapIcsType f (ItDateTime v) = ItDateTime $ f v
