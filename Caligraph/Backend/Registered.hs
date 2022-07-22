@@ -8,6 +8,7 @@ import qualified Caligraph.Remind.Backend
 import qualified Caligraph.IcsFile.Backend
 import qualified Caligraph.RemindPipe.Backend
 import qualified Caligraph.Plaintext.Backend
+import qualified Caligraph.ICalendar.Backend
 
 import Data.Hashable
 
@@ -19,7 +20,8 @@ backends =
     [ b "remindSimple"  Caligraph.Remind.Backend.backend
     , b "remindPipe"    Caligraph.RemindPipe.Backend.backend
     , b "plaintext"     Caligraph.Plaintext.Backend.backend
-    , b "icsfile"       Caligraph.IcsFile.Backend.backend
+    , b "icsfile-custom" Caligraph.IcsFile.Backend.backend
+    , b "icsfile-icalendar" Caligraph.ICalendar.Backend.backend
     ]
     where b x y = (x, SomeBackend y)
 
@@ -30,6 +32,6 @@ pathRegex2backend :: [(String,String)]
 pathRegex2backend =
   [ (,) ".*\\.rem$" "remindPipe"
   , (,) ".*\\.txt$" "plaintext"
-  , (,) ".*\\.ics$" "icsfile"
+  , (,) ".*\\.ics$" "icsfile-icalendar"
   ]
 

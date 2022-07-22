@@ -33,6 +33,7 @@ library
     Caligraph.IcsFile.Parser
     Caligraph.IcsFile.Printer
     Caligraph.Plaintext.Backend
+    Caligraph.ICalendar.Backend
     Caligraph.RemindPipe.Parser
     Caligraph.RemindPipe.Types
     Caligraph.RemindPipe.Backend
