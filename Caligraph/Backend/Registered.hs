@@ -19,6 +19,7 @@ backends :: [(String, SomeBackend)]
 backends =
     [ b "remindSimple"  Caligraph.Remind.Backend.backend
     , b "remindPipe"    Caligraph.RemindPipe.Backend.backend
+    , b "remind"    Caligraph.RemindPipe.Backend.backend
     , b "plaintext"     Caligraph.Plaintext.Backend.backend
     , b "icsfile-custom" Caligraph.IcsFile.Backend.backend
     , b "icsfile-icalendar" Caligraph.ICalendar.Backend.backend
