@@ -126,7 +126,7 @@ parseConfig :: CB.ConfigRead -> Either String (St, CB.WakeUpLoop Event)
 parseConfig cfg = do
     path <- mandatory CB.configFilePath "path"
     path_nr <- optional CB.configFilePath "path_append" path
-    rem_cmd <- optional CB.configString "remind_command" "remind"
+    rem_cmd <- optional CB.configFilePath "remind_command" "remind"
     let state = St path path_nr rem_cmd M.empty M.empty PS.empty
     return (state, wakeUpLoop state)
     where

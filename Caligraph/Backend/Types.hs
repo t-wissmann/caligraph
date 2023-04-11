@@ -102,7 +102,7 @@ type ConfigGetter a = String -> Maybe a
 data ConfigRead = ConfigRead
   { configString :: ConfigGetter String
   , configFilePath :: String -> Maybe FilePath
-  -- ^ returns an absolute filepath
+  -- ^ returns a filepath. if the config starts with './', then the path is made absolute
   }
 
 type WakeUpLoop event = (event -> IO ()) -> IO ()

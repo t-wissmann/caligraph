@@ -138,7 +138,7 @@ fromConfig cc = do
                 return $
                   case relpath of
                     ('/':_) -> relpath -- path is already absolute
-                    _ ->
+                    ('.':'/':_) -> -- path is relative
                       if (Conf.configFilePath cc == "")
                       then relpath  -- keep relative
                       else
@@ -146,6 +146,8 @@ fromConfig cc = do
                       -- calendar config file.
                       let dir = takeDirectory (Conf.configFilePath cc) in
                       joinPath [dir, relpath]
+                    _ -> -- do not modify path if unsure
+                      relpath
         }
 
 setRangeVisible :: Monad m => (Day,Day) -> CalendarT m ()
