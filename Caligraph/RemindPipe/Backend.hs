@@ -42,8 +42,9 @@ type Year = Integer
 
 -- basically parse the output of  remind -r -s -l file month year
 data St = St
-    { _path :: String -- a filepath with tilde not yet expanded
-    , _pathNewReminders :: String -- a filepath with tilde not yet expanded
+    { _path :: String -- a filepath with tilde expanded
+    , _pathNewReminders :: String -- a filepath with tilde expanded
+    , _remindCmd :: String -- name/path of the 'remind' programe (no ~ expansion)
     , _yearCache :: M.Map Year (CB.Incarnations')
     -- ^ mapping a year to the full array for all incarnations
     , _cacheMisses :: M.Map Year Bool
@@ -125,28 +126,34 @@ parseConfig :: CB.ConfigRead -> Either String (St, CB.WakeUpLoop Event)
 parseConfig cfg = do
     path <- mandatory CB.configFilePath "path"
     path_nr <- optional CB.configFilePath "path_append" path
-    let state = St path path_nr M.empty M.empty PS.empty
+    rem_cmd <- optional CB.configString "remind_command" "remind"
+    let state = St path path_nr rem_cmd M.empty M.empty PS.empty
     return (state, wakeUpLoop state)
     where
       mandatory = CB.mandatory cfg
       optional = CB.optional cfg
 
-requestYear :: FilePath -> Integer -> IO Event
-requestYear filepath (y) =
+requestYear :: Integer -> CB.BackendM St Event ()
+requestYear y =
   if y < 1990 || y > 2075 then
     let msg = "remind only supports years from 1990 to 2075" in
-    return $ YearData y [] (ExitFailure 1, msg)
+    CB.callback ("Cannot request year " ++ show y) $
+        (return $ YearData y [] (ExitFailure 1, msg))
   else do
-    let rem = "remind"
-    -- every year covers at most 54 weeks: 52 weeks entirely in the year,
-    -- one week with the year before, and one week with the next year
-    let rem_args = ["-r", "-s+55", "-l", filepath, "Jan", show y]
-    (exitCode,raw_output,raw_error) <- liftIO $ readProcessWithExitCode rem rem_args ""
-    let printedIncarnations = parseRemOutput raw_output
-    let getYear = (\(x,_,_) -> x) . toGregorian
-    let corretYear = (\(day,incarn) ->  y == getYear day)
-    let incarnationsInYear = filter corretYear printedIncarnations
-    return $ YearData y (map snd incarnationsInYear) (exitCode,raw_error)
+    rem_cmd <- use remindCmd
+    p <- use path
+    let rem_args = ["-r", "-s+55", "-l", p, "Jan", show y]
+    let full_cmd = intercalate " " (rem_cmd : rem_args)
+    CB.callback ("Requesting " ++ show y ++ " (" ++ full_cmd ++ ")") $
+        do
+        -- every year covers at most 54 weeks: 52 weeks entirely in the year,
+        -- one week with the year before, and one week with the next year
+        (exitCode,raw_output,raw_error) <- liftIO $ readProcessWithExitCode rem_cmd rem_args ""
+        let printedIncarnations = parseRemOutput raw_output
+        let getYear = (\(x,_,_) -> x) . toGregorian
+        let corretYear = (\(day,incarn) ->  y == getYear day)
+        let incarnationsInYear = filter corretYear printedIncarnations
+        return $ YearData y (map snd incarnationsInYear) (exitCode,raw_error)
 
 handleEvent :: CB.Event Event -> CB.BackendM St Event ()
 handleEvent (CB.SetRangeVisible days) = do
@@ -188,13 +195,10 @@ handleEvent (CB.Response (YearData y days (exitCode,stderr))) = do
 
 requestMissingYears :: CB.BackendM St Event ()
 requestMissingYears = do
-  path' <- use path
   cm <- use cacheMisses
   cm' <- flip M.traverseWithKey cm (\y v -> do
     -- if v is not True, then we don't have a request for it yet
-    unless v $
-        CB.callback ("Requesting year " ++ show y) $
-            requestYear path' y
+    unless v $ requestYear y
     -- we set the value of this year to True
     return True)
   cacheMisses .= cm'
