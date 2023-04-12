@@ -4,7 +4,7 @@ import Caligraph.Utils (mapLeft)
 import Caligraph.Config.Types
 
 import Data.Ini
-import Data.Text (Text, pack, unpack)
+import Data.Text (Text, pack, unpack, isPrefixOf, isSuffixOf)
 import qualified Data.Text.IO as T
 import qualified Data.HashMap.Strict as M
 import System.Environment.XDG.BaseDir
@@ -13,8 +13,11 @@ import Control.Monad.Trans.Except
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad
 import Text.Read
+import System.Process (shell, readProcessWithExitCode)
 import qualified Data.List.Split as Split
 import System.IO.Error
+import System.Exit
+import System.IO (hPutStrLn, hPutStr, stderr)
 import System.Environment (getArgs,setEnv)
 
 data Config = Config {
@@ -47,11 +50,45 @@ loadConfigFile fileName = do
     src <- liftIO $ getSource path
     parseConfigFile src
 
+
+-- | traverse and edit the values (i.e. right-hand sides) in an ini file
+traverseIniValues :: Applicative m => (Text -> m Text) -> Ini -> m Ini
+traverseIniValues actionOnValues ini =
+    Ini
+    <$> (traverse (traverse (traverse actionOnValues)) (iniSections ini))
+    <*> (traverse (traverse actionOnValues) (iniGlobals ini))
+
+
 -- | read a ini file and do other custom post-processing.
 -- This function should be used instead of `parseIni`
 parseConfigFile :: Text -> ExceptT String IO Ini
 parseConfigFile src = do
-    except $ parseIni src
+    plain_ini <- except $ parseIni src
+    flip traverseIniValues plain_ini $ \value -> do
+        if (pack "`") `isPrefixOf` value
+        then
+            if (pack "`") `isSuffixOf` value
+            then liftIO $ do
+                let shell_cmd = tail (dropLast (unpack value))
+                -- hPutStrLn stderr ("RUNNING: >" ++ unpack value ++ "<")
+                (code,out,err) <- readProcessWithExitCode "sh" ["-c", shell_cmd] ""
+                hPutStr stderr err
+                case code of
+                    ExitSuccess -> return ()
+                    ExitFailure c ->
+                        hPutStrLn stderr ("WARNING: `" ++ shell_cmd ++ "` exited with code " ++ show c ++ ".")
+                return (pack out)
+            else do
+                -- only print a warning
+                liftIO $ hPutStrLn stderr ("WARNING: unmatched backtick in value \"" ++ unpack value ++ "\"")
+                return value
+        else
+            return value
+    where
+        dropLast :: String -> String
+        dropLast [] = []
+        dropLast [x] = []
+        dropLast (x:xs) = x : dropLast xs
 
 load :: IO (Either String Config)
 load = do
