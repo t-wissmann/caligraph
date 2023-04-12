@@ -35,7 +35,7 @@ loadConfig
     -- ^ the loaded calendar list
 loadConfig path = do
     src <- liftIO $ T.readFile path
-    ini <- except $ parseIni src
+    ini <- parseConfigFile src
     mapM (parseSection path) $ M.toList $ unIni ini
     where
     parseSection path (a,b) =

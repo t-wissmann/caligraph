@@ -45,6 +45,12 @@ loadConfigFile
 loadConfigFile fileName = do
     path <- liftIO $ getUserConfigFile "caligraph" (fileName ++ ".ini")
     src <- liftIO $ getSource path
+    parseConfigFile src
+
+-- | read a ini file and do other custom post-processing.
+-- This function should be used instead of `parseIni`
+parseConfigFile :: Text -> ExceptT String IO Ini
+parseConfigFile src = do
     except $ parseIni src
 
 load :: IO (Either String Config)
@@ -73,9 +79,8 @@ data KeyConfig = KeyConfig { globalKeys :: [(KeyCombi, [String])] }
 keyConfigUserPath :: IO FilePath
 keyConfigUserPath = getUserConfigFile "caligraph" "keys.ini"
 
-parseKeyConfig :: Text -> Either String KeyConfig
-parseKeyConfig src = fmap KeyConfig $ do
-  ini <- parseIni src
+parseKeyConfig :: Ini -> Either String KeyConfig
+parseKeyConfig ini = fmap KeyConfig $ do
   let sec = maybe [] id $ fmap M.toList $ M.lookup (pack "") (unIni ini)
   forM sec (\(key,value) -> do
       keyParsed <- mapLeft (\_ -> "Invalid key combi " ++ unpack key)

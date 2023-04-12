@@ -111,8 +111,13 @@ mainConfigurable params = do
   config <- Cfg.load >>= rightOrDie
   Cfg.evaluateEnvironmentConfig (Cfg.environment config)
   -- load key config
-  customBinds <- Cfg.keyConfigUserPath >>= Cfg.getSource >>= CliM.loadKeyConfig
-  defaultBinds <- CliM.loadKeyConfig Cfg.defaultKeys
+  customBinds <- do
+    src <- Cfg.keyConfigUserPath >>= Cfg.getSource
+    ini <- runExceptT (Cfg.parseConfigFile src) >>= rightOrDie
+    CliM.loadKeyConfig ini
+  defaultBinds <- do
+    ini <- runExceptT (Cfg.parseConfigFile Cfg.defaultKeys) >>= rightOrDie
+    CliM.loadKeyConfig ini
   -- load calendar config
   cals <- loadCalendars params
   -- load rules

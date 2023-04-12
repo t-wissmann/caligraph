@@ -47,6 +47,7 @@ import Data.Semigroup
 import Data.Functor.Identity
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone,utcToLocalTime,LocalTime(LocalTime),TimeOfDay(TimeOfDay))
+import Data.Ini (Ini)
 import qualified Caligraph.Cli.UnicodeJunction as UJ
 
 import qualified Data.Text as T
@@ -594,9 +595,9 @@ emptyReminderEditor :: Brick.Editor String WidgetName
 emptyReminderEditor =
     (Brick.editor WNNewReminder (Just 1) "")
 
-loadKeyConfig :: T.Text -> IO KeyBindings
-loadKeyConfig src = do
-  kc <- rightOrDie $ fmap MainConfig.globalKeys $ MainConfig.parseKeyConfig src
+loadKeyConfig :: Ini -> IO KeyBindings
+loadKeyConfig ini = do
+  kc <- rightOrDie $ fmap MainConfig.globalKeys $ MainConfig.parseKeyConfig ini
   binds <- rightOrDie $ fmap Map.fromList $ forM kc (\(k,v) ->
     mapLeft (\s -> "In binding of \"" ++ userShow k ++ "\" to \"" ++ show v ++ ": " ++ s) $
     do
