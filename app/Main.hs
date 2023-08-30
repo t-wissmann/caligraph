@@ -94,6 +94,12 @@ printOptions = Headless.HeadlessOptions
     <> value Nothing
     <> help "Regex to filter entries by their title"
     )
+  <*> option (eitherReader Headless.parseOutputFormat)
+    ( long "format"
+    <> metavar "OUTPUTFORMAT"
+    <> value Headless.OfJson
+    <> help "Format of the output"
+    )
 
 getCalendarsIniPath :: IO FilePath
 getCalendarsIniPath = getUserConfigFile "caligraph" "calendars.ini"

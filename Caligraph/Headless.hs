@@ -22,6 +22,8 @@ import Data.Time.LocalTime (TimeZone)
 import qualified Data.ByteString.Lazy.Char8 as B
 import Text.Regex
 
+import qualified Caligraph.IcsFile.Export as IcsExport
+
 
 import Lens.Micro
 import Lens.Micro.TH
@@ -32,6 +34,13 @@ import System.Exit (ExitCode)
 import Control.Concurrent.Chan
 import System.IO (hPutStrLn, stderr)
 
+data OutputFormat = OfJson | OfIcs
+
+parseOutputFormat :: String -> Either String OutputFormat
+parseOutputFormat "json" = return OfJson
+parseOutputFormat "ics" = return OfIcs
+parseOutputFormat _ = fail "Valid formats: json, ics"
+
 data HeadlessOptions = HeadlessOptions
     -- { hoFirstDay :: Maybe Day
     -- , hoLastDay :: Maybe Day
@@ -39,6 +48,7 @@ data HeadlessOptions = HeadlessOptions
     { hoFirstDay :: Maybe Day
     , hoLastDay :: Maybe Day
     , hoTitleFilter :: Maybe Regex
+    , hoFormat :: OutputFormat
     }
 
 data HeadlessEvent =
@@ -94,8 +104,9 @@ initState cals = do
 main :: [(T.Text,CC.ConfiguredCalendar)] -> HeadlessOptions -> IO ()
 main cals opts = do
   state <- initState cals
+  let format = hoFormat opts
   -- extract all reminders and print each of them
-  ((),state') <- runStateT (extractReminders opts >>= (liftIO . printReminders)) state
+  ((),state') <- runStateT (extractReminders opts >>= (liftIO . printReminders format)) state
   return ()
 
 
@@ -128,9 +139,12 @@ extractReminders opts = do
 
 
 printReminders
-    :: [FullReminder]
+    ::
+    OutputFormat
+    -> [FullReminder]
     -> IO ()
-printReminders = B.putStrLn . encodePretty
+printReminders OfJson = B.putStrLn . encodePretty
+printReminders OfIcs = putStrLn . IcsExport.print . map frMain
 
 data FullReminder = FullReminder
     { frCalendar :: Text

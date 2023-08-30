@@ -46,6 +46,7 @@ library
     Caligraph.Cli.Types
     Caligraph.Cli.AppState
     Caligraph.Cli.UnicodeJunction
+    Caligraph.IcsFile.Export
     Caligraph.Config.Main
     Caligraph.Config.Types
     Caligraph.Config.Calendars
