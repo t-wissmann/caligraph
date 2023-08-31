@@ -144,7 +144,7 @@ printReminders
     -> [FullReminder]
     -> IO ()
 printReminders OfJson = B.putStrLn . encodePretty
-printReminders OfIcs = putStrLn . IcsExport.print . map frMain
+printReminders OfIcs = B.putStrLn . IcsExport.print . map frMain
 
 data FullReminder = FullReminder
     { frCalendar :: Text
