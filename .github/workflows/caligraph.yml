@@ -42,8 +42,8 @@ jobs:
     - name: Install
       run: |
         stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --copy-bins
-        mkdir caligraph-bin
-        cp -r `stack path --local-bin`/* caligraph-bin/
+        mkdir -p caligraph-bin/${{ matrix.os }}/
+        cp -r `stack path --local-bin`/* caligraph-bin/${{ matrix.os }}/
 
     - uses: actions/upload-artifact@v2
       with:
