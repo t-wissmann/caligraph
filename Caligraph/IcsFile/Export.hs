@@ -23,8 +23,8 @@ init_metadata = Metadata <$> getCurrentTime
 
 print :: Metadata -> [CB.Incarnation ()] -> B.ByteString
 print meta incs = printICalendar def $ VCalendar
-    { vcProdId = (ProdId (T.pack "caligraph") def)
-    , vcVersion = (MaxICalVersion (Version [] []) def)
+    { vcProdId = (ProdId (T.pack "-//caligraph//thorsten-wissmann.de") def)
+    , vcVersion = (MaxICalVersion (Version [2, 0] []) def)
     , vcScale = def
     , vcMethod = Nothing
     , vcOther = S.empty
