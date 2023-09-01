@@ -2,7 +2,7 @@ on: push
 
 jobs:
  stack:
-    name: stack / ghc ${{ matrix.ghc }}
+    name: stack / ghc ${{ matrix.ghc }} on ${{ matrix.os }}
     strategy:
       matrix:
         stack: ["2.3.1"]
