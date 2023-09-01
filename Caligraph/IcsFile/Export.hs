@@ -4,7 +4,9 @@ import qualified Caligraph.Backend.Types as CB
 import qualified Caligraph.Backend.Utils as CB
 import qualified Data.ByteString.Lazy as B
 import Data.Default
+import Data.Time.Calendar
 import Data.Version (Version(Version))
+import Data.Hashable
 import qualified Data.Text.Lazy as T
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -85,4 +87,9 @@ convert_incarnation meta index inc = VEvent
     , veOther         = S.empty
     }
     where
-        uid = "item" ++ show index
+    uid = show $ hash $
+        [ hash (toModifiedJulianDay $ CB.day inc)
+        , hash (CB.time inc)
+        , hash (CB.duration inc)
+        , hash (CB.title inc)
+        ]
