@@ -143,8 +143,10 @@ printReminders
     OutputFormat
     -> [FullReminder]
     -> IO ()
-printReminders OfJson = B.putStrLn . encodePretty
-printReminders OfIcs = B.putStrLn . IcsExport.print . map frMain
+printReminders OfJson reminders = B.putStrLn $ encodePretty reminders
+printReminders OfIcs reminders = do
+    meta <- IcsExport.init_metadata
+    B.putStr $ IcsExport.print meta $ map frMain reminders
 
 data FullReminder = FullReminder
     { frCalendar :: Text
