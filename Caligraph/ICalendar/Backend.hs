@@ -111,6 +111,45 @@ reloadFile = do
     eitherResult <- ICal.parseICalendarFile def fp
     return eitherResult
 
+vevent2incarnation :: ICal.VEvent -> ICal.DTStart -> a -> CB.Incarnation a
+vevent2incarnation event start itemId =
+    CB.Incarnation day time duration summary itemId
+    where
+        projHM :: TimeOfDay -> (Int,Int)
+        projHM tod = (todHour tod, todMin tod)
+        difftime2HM :: DiffTime -> (Int,Int)
+        difftime2HM difft =
+            let picosec = diffTimeToPicoseconds difft in
+            let tenExp12 = 1000000000000 in
+            let mindiff = fromIntegral ((picosec `div` tenExp12) `div` 60) in
+            (mindiff `div` 60, mindiff `mod` 60)
+
+        datetime2tuple :: ICal.DateTime -> (Day, Maybe (Int,Int))
+        datetime2tuple d =
+                case d of
+                ICal.FloatingDateTime (LocalTime d t) -> (d, Just $ projHM t)
+                ICal.UTCDateTime (UTCTime d t) -> (d, Just $ difftime2HM t)
+                ICal.ZonedDateTime (LocalTime d t) zone -> (d, Just $ projHM t)
+        (day, time) = case start of
+            ICal.DTStartDateTime d _ -> datetime2tuple d
+            ICal.DTStartDate d _ -> (ICal.dateValue d, Nothing)
+        duration = case ICal.veDTEndDuration event of
+                  Nothing -> Nothing
+                  Just (Left (ICal.DTEndDate _ _)) -> Nothing
+                  Just (Left (ICal.DTEndDateTime endDateTime _)) ->
+                    do -- in Maybe
+                    has_start_time <- time
+                    has_end_time <- snd $ datetime2tuple endDateTime
+                    return $ has_end_time `CU.diffTime` has_start_time
+
+                  Just (Right ical_duration) ->
+                    case (ICal.durationValue ical_duration) of
+                    ICal.DurationDate sign d h m sec -> Just (h, m)
+                    ICal.DurationTime sign h m sec  -> Just (h, m)
+                    ICal.DurationWeek _ _ -> Nothing
+        summary = fromMaybe "" (unpack <$> ICal.summaryValue <$> ICal.veSummary event)
+
+
 cachedIncarnations :: St -> (Day,Day) -> CB.Incarnations'
 cachedIncarnations st (from,to) =
     A.accumArray (flip (:)) [] (from,to)
@@ -123,21 +162,14 @@ cachedIncarnations st (from,to) =
             Just x -> (x:l)
             Nothing -> l
 
-        extractDayFromDateTime :: ICal.DateTime -> Day
-        extractDayFromDateTime (ICal.FloatingDateTime (LocalTime d t)) = d
-        extractDayFromDateTime (ICal.UTCDateTime (UTCTime d _)) = d
-        extractDayFromDateTime (ICal.ZonedDateTime (LocalTime d t) zone) = d
-
         extractEvent :: VEventKey -> ICal.VEvent -> Maybe (Day,CB.Incarnation')
         extractEvent key event = do
             start <- ICal.veDTStart event
-            let day = case start of
-                    ICal.DTStartDateTime d _ -> extractDayFromDateTime d
-                    ICal.DTStartDate d _ -> ICal.dateValue d
-            summary <- unpack <$> ICal.summaryValue <$> ICal.veSummary event
             let itemId = PS.lookupUnsafe (_idStore st) key
+            let incarn = vevent2incarnation event start itemId
+            let day = CB.day incarn
             if from <= day && day <= to
-            then return (day, CB.Incarnation day Nothing Nothing summary itemId)
+            then return (day, incarn)
             else Nothing
 
 backend :: CB.Backend St Event
