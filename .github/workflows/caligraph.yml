@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/master'
 
     - uses: actions/setup-haskell@v1.1.4
@@ -21,7 +21,7 @@ jobs:
         ghc-version: ${{ matrix.ghc }}
         stack-version: ${{ matrix.stack }}
 
-    - uses: actions/cache@v1
+    - uses: actions/cache@v3
       name: Cache ~/.stack
       with:
         path: ~/.stack
@@ -45,7 +45,7 @@ jobs:
         mkdir -p caligraph-bin/
         cp -r `stack path --local-bin`/* caligraph-bin/
 
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v4
       with:
         name: Binaries ${{ matrix.os }}
         path: caligraph-bin
